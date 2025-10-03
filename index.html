@@ -95,7 +95,7 @@
             </header>
 
             <h2 class="text-2xl font-bold text-gray-100 mb-2 text-center">Benvingut/da! Tria el teu Nivell de Pràctica</h2>
-            <p class="text-gray-400 text-center mb-8 max-w-xl mx-auto">Practica la identificació d'acords. La tònica és aleatòria (de C3 a B3), però el tipus d'acord és l'únic que has de reconèixer. Tria el teu nivell.</p>
+            <p class="text-gray-400 text-center mb-8 max-w-xl mx-auto">Practica la identificació d'acords. La fonamental és aleatòria (de C3 a B3), però el tipus d'acord és l'únic que has de reconèixer. Tria el teu nivell.</p>
 
             <div class="grid md:grid-cols-3 gap-6 max-w-5xl mx-auto">
                 <!-- Botons amb el color Blau Fosc -->
@@ -131,9 +131,9 @@
                         <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clip-rule="evenodd" />
                     </svg>
                 </button>
-                <!-- Eliminem l'etiqueta de direcció ja que no s'aplica als acords -->
+                <!-- Label per a l'acord a reconèixer -->
                 <p id="directionLabel" class="text-lg font-semibold text-gray-300 mb-4">Reconeix l'Acord</p> 
-                <!-- Línia de debug per a la tònica (oculta per defecte) -->
+                <!-- Línia de debug per a la fonamental (oculta per defecte) -->
                 <p id="debugNotes" class="hidden text-xs text-gray-500 mb-2"></p> 
 
                 <!-- Barra de progrés del temporitzador (30 segons), utilitzant Blau -->
@@ -187,10 +187,10 @@
         const AUDIO_PATH = './audio/'; 
         
         // RANG DE NOTES DEL TEU ACORD (C3 a B3, inclosos)
-        // Aquests números MIDI es mapping al fitxer de la TÒNICA
+        // Aquests números MIDI es mapping al fitxer de la FONAMENTAL
         const MIDI_START = 48; // C3 (Nota més baixa)
         const MIDI_END = 59;   // B3 (Nota més alta)
-        const TOTAL_MIDI_TONICS = MIDI_END - MIDI_START + 1; // 12 tòniques possibles
+        const TOTAL_MIDI_ROOTS = MIDI_END - MIDI_START + 1; // 12 fonamentals possibles
 
         // TEMPS D'ESPERA ENTRE NOTES (ja no cal, però el mantenim per si de cas)
         const NOTE_DELAY_MS = 700; 
@@ -200,7 +200,7 @@
         // CACHE: Emmagatzemarà tots els objectes Audio ja carregats
         const audioCache = {};
 
-        // MAPA DE TIPUS D'ACORDS I EL SEU NOM DE L'ARXIU (la clau és el nom de l'arxiu SENSE la tònica)
+        // MAPA DE TIPUS D'ACORDS I EL SEU NOM DE L'ARXIU (la clau és el nom de l'arxiu SENSE la fonamental)
         const CHORD_NAMES = {
             'Maj': 'Major', 
             'Men': 'Menor',
@@ -238,7 +238,7 @@
             timeRemaining: TIMER_DURATION,
             // currentDirection: null, // No cal per als acords
             isAnswered: false,
-            baseNoteMIDI: null, // La tònica (root) de l'acord
+            baseNoteMIDI: null, // La fonamental (root) de l'acord
             currentChordLabel: null, // Nom de l'acord (per al feedback)
             isAudioReady: false, 
         };
@@ -274,11 +274,11 @@
         // ===============================================
         
         /**
-         * Converteix un número MIDI a nom de TÒNICA (ex: 48 -> C3).
-         * @param {number} midiNumber - El número MIDI de la tònica.
+         * Converteix un número MIDI a nom de FONAMENTAL (ex: 48 -> C3).
+         * @param {number} midiNumber - El número MIDI de la fonamental.
          * @returns {string} El nom de la nota amb octava (ex: C3, D#3).
          */
-        function getTonicName(midiNumber) {
+        function getRootName(midiNumber) {
             const notesMap = [
                 'C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'
             ];
@@ -286,19 +286,19 @@
             const noteIndex = midiNumber % 12;
             const finalNoteName = notesMap[noteIndex];
             
-            // Retorna la Tònica amb l'Octava
+            // Retorna la Fonamental amb l'Octava
             return `${finalNoteName}${octave}`;
         }
         
         /**
          * Genera el nom complet del fitxer d'àudio per a la precàrrega.
-         * @param {number} midiNumber - El número MIDI de la tònica (C3-B3).
+         * @param {number} midiNumber - El número MIDI de la fonamental (C3-B3).
          * @param {string} chordType - El tipus d'acord (ex: 'Maj', 'Dim7').
          * @returns {string} La URL completa (ex: ./audio/C3-Maj.mp3).
          */
         function getFileName(midiNumber, chordType) {
-            const tonicName = getTonicName(midiNumber).replace('#', 's'); // Utilitzem 's' pel sostingut en l'arxiu (ex: C#3 -> Cs3)
-            return `${AUDIO_PATH}${tonicName}-${chordType}.mp3`;
+            const rootName = getRootName(midiNumber).replace('#', 's'); // Utilitzem 's' pel sostingut en l'arxiu (ex: C#3 -> Cs3)
+            return `${AUDIO_PATH}${rootName}-${chordType}.mp3`;
         }
         
         /**
@@ -307,7 +307,7 @@
         function preloadAllAudio() {
             return new Promise((resolve, reject) => {
                 const totalChords = ALL_CHORDS.length;
-                const totalFilesToLoad = TOTAL_MIDI_TONICS * totalChords; // 12 tòniques * 9 tipus = 108 fitxers
+                const totalFilesToLoad = TOTAL_MIDI_ROOTS * totalChords; // 12 fonamentals * 9 tipus = 108 fitxers
                 
                 let filesLoaded = 0;
                 let errors = 0;
@@ -342,12 +342,12 @@
                     }
                 };
 
-                // Bucle per a TOTES les combinacions possibles (12 Tòniques x 9 Acords)
+                // Bucle per a TOTES les combinacions possibles (12 Fonamentals x 9 Acords)
                 for (let midi = MIDI_START; midi <= MIDI_END; midi++) {
                     ALL_CHORDS.forEach(chordType => {
                         const fileKey = `${midi}-${chordType}`; // Clau única pel cache
                         // La nomenclatura dels arxius que utilitzem en la llista:
-                        const fileName = `${AUDIO_PATH}${getTonicName(midi).replace('#', 's')}-${chordType}.mp3`;
+                        const fileName = `${AUDIO_PATH}${getRootName(midi).replace('#', 's')}-${chordType}.mp3`;
 
                         const audio = new Audio(fileName);
                         audioCache[fileKey] = audio; 
@@ -427,7 +427,7 @@
 
             try {
                 resetAndPlay(audio);
-                // console.log(`Reproduint: ${gameState.currentChordLabel} sobre ${getTonicName(gameState.baseNoteMIDI)}.`);
+                // console.log(`Reproduint: ${gameState.currentChordLabel} sobre ${getRootName(gameState.baseNoteMIDI)}.`);
             } catch(e) {
                  console.error("Error crític de reproducció:", e);
                  elements.feedbackMessage.textContent = 'Error de reproducció inesperat.';
@@ -461,7 +461,7 @@
         }
 
         /**
-         * Genera un acord aleatori amb la tònica (MIDI) i el tipus.
+         * Genera un acord aleatori amb la fonamental (MIDI) i el tipus.
          */
         function generateChord() {
             const config = DIFFICULTY_CONFIG[gameState.difficulty];
@@ -470,15 +470,15 @@
             // 1. Selecciona un tipus d'acord aleatori
             let chordType = availableChords[Math.floor(Math.random() * availableChords.length)];
             
-            // 2. Selecciona una tònica MIDI aleatòria (de C3 a B3)
-            let tonicMIDI;
+            // 2. Selecciona una fonamental MIDI aleatòria (de C3 a B3)
+            let rootMIDI;
             let fileKey;
             let attempts = 0;
             const MAX_ATTEMPTS = 50;
 
             // Bucle per assegurar-nos que l'acord aleatori escollit realment s'ha carregat a la memòria
             do {
-                tonicMIDI = Math.floor(Math.random() * (MIDI_END - MIDI_START + 1)) + MIDI_START;
+                rootMIDI = Math.floor(Math.random() * (MIDI_END - MIDI_START + 1)) + MIDI_START;
                 
                 // Si l'acord escollit falla, intentem amb un tipus de menys dificultat (Maj/Men)
                 if (attempts > MAX_ATTEMPTS / 2) {
@@ -486,7 +486,7 @@
                     chordType = fallbackChords[Math.floor(Math.random() * fallbackChords.length)];
                 }
 
-                fileKey = `${tonicMIDI}-${chordType}`;
+                fileKey = `${rootMIDI}-${chordType}`;
                 attempts++;
             } while (!audioCache[fileKey] || attempts > MAX_ATTEMPTS); // Intentar fins a 50 vegades
 
@@ -500,7 +500,7 @@
 
             return {
                 correctChordType: chordType, 
-                baseNoteMIDI: tonicMIDI, 
+                baseNoteMIDI: rootMIDI, 
                 label: `${chordLabel}`
             };
         }
@@ -527,7 +527,7 @@
             elements.playButton.disabled = !gameState.isAudioReady;
             elements.playButton.classList.remove('opacity-50');
             
-            elements.directionLabel.textContent = `Reconeix l'Acord (Tònica: ${getTonicName(gameState.baseNoteMIDI)})`;
+            elements.directionLabel.textContent = `Reconeix l'Acord (Fonamental: ${getRootName(gameState.baseNoteMIDI)})`;
             
             // 2. Genera els botons d'opció UTILITZANT NOMÉS ELS TIPUS D'ACORD D'AQUEST NIVELL
             const optionsToUse = DIFFICULTY_CONFIG[gameState.difficulty].chords;
