@@ -101,15 +101,15 @@
                 <!-- Botons amb el color Blau Fosc -->
                 <button onclick="startGame('easy')" class="difficulty-button text-white font-semibold rounded-lg hover:brightness-110 p-6 flex flex-col items-center text-center">
                     <span class="text-xl font-bold mb-2">Fàcil (Tríades Bàsiques)</span>
-                    <span class="text-sm opacity-90">Acords: Major (Maj), Menor (Men).</span>
+                    <span class="text-sm opacity-90">Acords: Maj, Men.</span>
                 </button>
                 <button onclick="startGame('medium')" class="difficulty-button text-white font-semibold rounded-lg hover:brightness-110 p-6 flex flex-col items-center text-center">
                     <span class="text-xl font-bold mb-2">Mitjà (Totes les Tríades)</span>
-                    <span class="text-sm opacity-90">Acords: Maj, Men, Augmentat (Aug), Disminuït (Dim).</span>
+                    <span class="text-sm opacity-90">Acords: Maj, Men, Aug, Dism.</span>
                 </button>
                 <button onclick="startGame('hard')" class="difficulty-button text-white font-semibold rounded-lg hover:brightness-110 p-6 flex flex-col items-center text-center">
                     <span class="text-xl font-bold mb-2">Difícil (Tríades i Setenes)</span>
-                    <span class="text-sm opacity-90">Acords: Tots els anteriors + Setenes (Maj7, Dom7, Men7, Dim7, AugM7).</span>
+                    <span class="text-sm opacity-90">Acords: Maj, Men, Aug, Dism, Maj 7, Dom 7, Men 7, Dism 7, Aug M7.</span>
                 </button>
             </div>
         </div>
@@ -199,22 +199,53 @@
 
         // CACHE: Emmagatzemarà tots els objectes Audio ja carregats
         const audioCache = {};
-
-        // MAPA DE TIPUS D'ACORDS I EL SEU NOM DE L'ARXIU (la clau és el nom de l'arxiu SENSE la fonamental)
-        const CHORD_NAMES = {
-            'Maj': 'Major', 
-            'Men': 'Menor',
-            'Aug': 'Augmentat',
-            'Dim': 'Disminuït',
-            'Maj7': 'Setena Major',
-            'Dom7': 'Setena de Dominant', // Tríada Major + 7a Menor
-            'Men7': 'Setena Menor', 
-            'Dim7': 'Setena Disminuïda',
-            'AugM7': 'Setena Major Augmentada'
+        
+        // ABREVIATURES D'ACORD (Clau: Nom del fitxer MP3; Valor: Text del botó)
+        const CHORD_ABBREVIATIONS = {
+            'Maj': 'Maj',           
+            'Men': 'Men',           
+            'Aug': 'Aug',           
+            'Dim': 'Dism',          
+            'Maj7': 'Maj 7',        // Setena Major
+            'Dom7': 'Dom 7',        // Setena de Dominant (Utilitzem Dom7 per al fitxer, però es pot reanomenar si el fitxer és un altre)
+            'Men7': 'Men 7',        // Setena Menor
+            'Dim7': 'Dism 7',       // Setena Disminuïda
+            'AugM7': 'Aug M7'       // Setena Major Augmentada 
         };
 
-        const ALL_CHORDS = Object.keys(CHORD_NAMES);
-
+        const ALL_CHORDS = Object.keys(CHORD_ABBREVIATIONS);
+        
+        // NOU ARRAY: ORDRE DE VISUALITZACIÓ DELS BOTONS
+        // Utilitzem les claus dels fitxers per mantenir l'ordre intern correcte,
+        // garantint la nomenclatura sol·licitada (Maj, Men, Aug, Dism, Maj Maj7, Men 7, etc.)
+        const CHORD_DISPLAY_ORDER = [
+            'Maj',    // Major
+            'Men',    // Menor
+            'Aug',    // Augmentat
+            'Dim',    // Disminuït
+            'AugM7',  // Augmentat Maj7 (Aug M7) - Utilitzem AugM7 (Nom de l'arxiu)
+            'Maj7',   // Major Maj7 (Maj 7) - Utilitzem Maj7 (Nom de l'arxiu)
+            'Men7',   // Menor 7 (Men 7)
+            'Dim7',   // Disminuït 7 (Dism 7)
+            'Dom7',   // Setena de Dominant (Dom 7) - Si es vol 'Maj 7', caldrà canviar 'Dom7' per 'Maj7' als noms de fitxers si el fitxer Dom7 no existeix.
+                      // Basant-me en la teva llista d'abreviacions anteriorment proposada: Maj Maj7, Men 7, Major 7, Dism 7, Aug Maj7, 
+                      // assumeixo que els 9 tipus de fitxer són els definits per ALL_CHORDS (Maj, Men, Aug, Dim, Maj7, Dom7, Men7, Dim7, AugM7).
+                      // Per complir amb l'ordre visual i la nomenclatura, cal assignar correctament els fitxers:
+                      // 'Maj7' es mostra com 'Maj 7' (Setena Major)
+                      // 'Men7' es mostra com 'Men 7' (Setena Menor)
+                      // 'Dom7' es mostra com 'Dom 7' (Setena de Dominant)
+                      // L'ordre sol·licitat sembla barrejar setenes majors/menors amb els noms dels fitxers, així que mantinc la lògica de 9 tipus d'acord diferents:
+                      // 1. Maj, 2. Men, 3. Aug, 4. Dim
+                      // 5. Maj7 (Maj 7), 6. Men7 (Men 7), 7. Dom7 (Dom 7), 8. Dim7 (Dism 7), 9. AugM7 (Aug M7)
+                      
+                      // ** RE-INTERPRETACIÓ de l'ordre sol·licitat vs. Fitxers disponibles (Maj, Men, Aug, Dim, Maj7, Dom7, Men7, Dim7, AugM7) **
+                      // Sol·licitat: [Major, Menor, Augmentat, Disminuït, Major Maj7, Menor 7, Major 7, Disminuït 7, Augmentat Maj7]
+                      // Utilitzarem l'ordre de les claus de fitxer que s'aproximen més a la teva sol·licitud:
+                      // 'Maj', 'Men', 'Aug', 'Dim', 'AugM7', 'Maj7', 'Men7', 'Dim7', 'Dom7'
+        ];
+        // Nota: Aquesta ordre cobreix els 9 acords de la dificultat "Difícil".
+        
+        
         // CONFIGURACIÓ DELS NIVELLS DE DIFICULTAT (UTILITZANT ELS NOMS DELS FITXERS)
         const DIFFICULTY_CONFIG = {
             easy: {
@@ -493,10 +524,11 @@
             if (attempts > MAX_ATTEMPTS) {
                 console.error("No s'ha pogut trobar un arxiu d'acord vàlid al cache després de molts intents.");
                 // Fallback a un acord conegut si la precàrrega va fallar en tots
-                return { correctChordType: 'Maj', baseNoteMIDI: 48, label: 'Major' }; 
+                return { correctChordType: 'Maj', baseNoteMIDI: 48, label: 'Maj' }; 
             }
             
-            const chordLabel = CHORD_NAMES[chordType];
+            // Utilitzem l'abreviatura per al feedback/etiqueta
+            const chordLabel = CHORD_ABBREVIATIONS[chordType];
 
             return {
                 correctChordType: chordType, 
@@ -522,7 +554,7 @@
             const newChord = generateChord();
             gameState.correctChordType = newChord.correctChordType;
             gameState.baseNoteMIDI = newChord.baseNoteMIDI;
-            gameState.currentChordLabel = newChord.label;
+            gameState.currentChordLabel = newChord.label; // Label amb l'abreviatura
 
             elements.playButton.disabled = !gameState.isAudioReady;
             elements.playButton.classList.remove('opacity-50');
@@ -553,20 +585,23 @@
         function generateOptions(availableOptions) {
             elements.intervalOptions.innerHTML = ''; 
             
-            // Mapegem les claus (Maj) als noms (Major) per als botons
-            const buttonsData = availableOptions.map(key => ({
+            // 1. Filtrem l'ordre de visualització global (CHORD_DISPLAY_ORDER)
+            // per incloure només els acords disponibles en la dificultat actual.
+            const orderedOptions = CHORD_DISPLAY_ORDER.filter(key => availableOptions.includes(key));
+
+            // 2. Mapegem les claus a les dades per als botons
+            const buttonsData = orderedOptions.map(key => ({
                 key: key, 
-                label: CHORD_NAMES[key] 
+                label: CHORD_ABBREVIATIONS[key] // Utilitzem l'abreviatura
             }));
             
-            // Ordenem per longitud o alfabèticament per millor UX
-            buttonsData.sort((a, b) => a.label.localeCompare(b.label));
-
+            // 3. Creem els botons en l'ordre establert
             buttonsData.forEach(chord => {
                 const button = document.createElement('button');
                 button.textContent = chord.label;
                 button.setAttribute('data-chord-type', chord.key);
                 button.onclick = () => checkAnswer(chord.key, button);
+                // Classes per a estils consistents i responsive
                 button.classList.add('py-3', 'px-4', 'bg-gray-700', 'text-gray-100', 'font-semibold', 'rounded-lg', 'shadow-sm', 'hover:bg-blue-600', 'hover:text-white', 'transition', 'duration-150', 'text-sm', 'md:text-base');
                 elements.intervalOptions.appendChild(button);
             });
@@ -575,11 +610,13 @@
             let gridLayout = 'repeat(auto-fit, minmax(120px, 1fr))';
             
             if (numOptions > 6) {
-                gridLayout = 'repeat(3, minmax(120px, 1fr))'; // Per a dificultat Mitjana/Difícil
+                 // Per a 9 opcions, el minmax de 100px garanteix que s'adapti bé a mòbil i que en desktop estigui equilibrat
+                gridLayout = 'repeat(auto-fit, minmax(100px, 1fr))'; 
+            } else if (numOptions > 4) {
+                 // Per a 4 opcions (Mitjà), mantenim 2 columnes en pantalles petites, 4 en grans
+                gridLayout = 'repeat(auto-fit, minmax(120px, 1fr))';
             }
-             if (numOptions > 8) {
-                gridLayout = 'repeat(auto-fit, minmax(100px, 1fr))'; // Per a dificultat Difícil (9 opcions)
-            }
+            // En pantalles molt grans, Tailwind ho gestionarà bé amb el 'gap-3' i els 'px-4'
             elements.intervalOptions.style.gridTemplateColumns = gridLayout;
         }
 
