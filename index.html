@@ -69,10 +69,10 @@
 <body class="bg-gray-950 min-h-screen flex flex-col items-center justify-center p-4">
 
     <!-- POP-UP d'ERROR D'AUDIO -->
-    <div id="audioErrorPopup" class="audio-error-popup hidden bg-red-600 text-white p-3 rounded-lg shadow-xl max-w-xs transition duration-300 transform scale-100">
+    <div id="audioErrorPopup" class="audio-error-popup hidden bg-red-600 text-white p-3 rounded-lg shadow-xl max-w-sm transition duration-300 transform scale-100">
         <p class="font-bold mb-1">⚠️ Error de Precàrrega</p>
         <p id="audioErrorMessage" class="text-sm">No s'han pogut carregar tots els fitxers d'acord.</p>
-        <p class="text-xs mt-1 opacity-80">Assegura't que el path i la nomenclatura dels arxius sigui correcta (ex: **C3-Maj.mp3, Cs3-Men7.mp3**).</p>
+        <p class="text-xs mt-1 opacity-80">Revisa la nomenclatura de l'arxiu que no es troba.</p>
     </div>
 
     <!-- Contenidor principal de l'aplicació: Fosc i amb ombra subtil -->
@@ -183,17 +183,13 @@
         // VARIABLES GLOBALS I CONFIGURACIÓ (ADAPTAT PER ACORDS)
         // ===============================================
 
-        // RUTA DE L'ÀUDIO: Utilitzem una ruta relativa (./audio/)
-        const AUDIO_PATH = './audio/'; 
+        // RUTA DE L'ÀUDIO: ACTUALITZADA A LA CARPETA 'audios' (PLURAL)
+        const AUDIO_PATH = './audios/'; 
         
         // RANG DE NOTES DEL TEU ACORD (C3 a B3, inclosos)
-        // Aquests números MIDI es mapping al fitxer de la FONAMENTAL
         const MIDI_START = 48; // C3 (Nota més baixa)
         const MIDI_END = 59;   // B3 (Nota més alta)
         const TOTAL_MIDI_ROOTS = MIDI_END - MIDI_START + 1; // 12 fonamentals possibles
-
-        // TEMPS D'ESPERA ENTRE NOTES (ja no cal, però el mantenim per si de cas)
-        const NOTE_DELAY_MS = 700; 
 
         const TIMER_DURATION = 30; // Temps en segons
 
@@ -256,7 +252,7 @@
             isAudioReady: false, 
         };
 
-        // Referències al DOM (les mateixes)
+        // Referències al DOM
         const screens = {
             difficulty: document.getElementById('difficultyScreen'),
             quiz: document.getElementById('quizScreen'),
@@ -283,12 +279,11 @@
 
 
         // ===============================================
-        // UTILS D'ÀUDIO I MIDI (ADAPTAT PER ACORDS)
+        // UTILS D'ÀUDIO I MIDI
         // ===============================================
         
         /**
-         * Converteix un número MIDI a nom de FONAMENTAL. 
-         * Important: Utilitza '#' per a la visualització, però no per als noms d'arxiu.
+         * Converteix un número MIDI a nom de FONAMENTAL per a la VISUALITZACIÓ (utilitza #).
          * @param {number} midiNumber - El número MIDI de la fonamental.
          * @returns {string} El nom de la nota amb octava (ex: C3, C#3).
          */
@@ -306,11 +301,12 @@
         
         /**
          * Genera el nom de la FONAMENTAL utilitzant 's' en lloc de '#'.
+         * AQUEST NOM S'UTILITZA PER ALS FITXERS.
          * @param {number} midiNumber - El número MIDI de la fonamental (C3-B3).
          * @returns {string} El nom de l'arxiu de la nota (ex: C3, Cs3, Ds3).
          */
         function getFileRootName(midiNumber) {
-            // Aquest map s'utilitza per al NOM DE L'ARXIU (Cs3)
+            // ACTUALITZAT: Aquest map utilitza 's' per coincidir amb la nomenclatura dels vostres arxius.
             const fileNotesMap = [
                 'C', 'Cs', 'D', 'Ds', 'E', 'F', 'Fs', 'G', 'Gs', 'A', 'As', 'B'
             ];
@@ -323,18 +319,16 @@
 
         /**
          * Genera la URL completa del fitxer d'àudio.
-         * Utilitza la nomenclatura amb 's' per als sostinguts.
          * @param {number} midiNumber - El número MIDI de la fonamental (C3-B3).
          * @param {string} chordType - El tipus d'acord (ex: 'Maj', 'Dim7').
-         * @returns {string} La URL completa (ex: ./audio/Cs3-Maj.mp3).
+         * @returns {string} La URL completa (ex: ./audios/Cs3-Maj.mp3).
          */
         function getFileName(midiNumber, chordType) {
             const rootName = getFileRootName(midiNumber); // Ex: "Cs3" o "C3"
             
-            // Construeix el nom del fitxer
+            // Construeix el nom del fitxer.
             const rawFileName = `${rootName}-${chordType}.mp3`;
             
-            // No cal codificar, ja que 's' no és un caràcter problemàtic
             return `${AUDIO_PATH}${rawFileName}`;
         }
         
@@ -348,13 +342,13 @@
                 
                 let filesLoaded = 0;
                 let errors = 0;
-                let failedFiles = [];
+                let failedUrls = [];
 
-                const onLoaded = (isError, fileName) => {
+                const onLoaded = (isError, fileURL) => { 
                     filesLoaded++;
                     if (isError) {
                         errors++;
-                        console.warn(`Fallada en carregar: ${fileName}`);
+                        console.warn(`Fallada en carregar: ${fileURL}`);
                     }
                     
                     const percentage = Math.round((filesLoaded / totalFilesToLoad) * 100);
@@ -368,34 +362,32 @@
                         } else {
                             console.warn(`Precàrrega finalitzada amb ${errors} fitxers fallits.`);
                             
-                            // Si hi ha massa errors, rebutgem per mostrar l'alerta
-                            if (errors > totalFilesToLoad * 0.9) { 
-                                reject({
-                                    errorCount: errors,
-                                    failedFiles: failedFiles
-                                });
-                            } else {
-                                resolve(); // Si la majoria estan bé, continuem
-                            }
+                            // Si hi ha errors, rebutgem per mostrar l'alerta
+                            reject({
+                                errorCount: errors,
+                                failedUrls: failedUrls
+                            });
                         }
                     }
                 };
 
-                // Bucle per a TOTES les combinacions possibles (12 Fonamentals x 9 Acords)
+                // Bucle per a TOTES les combinacions possibles
                 for (let midi = MIDI_START; midi <= MIDI_END; midi++) {
                     ALL_CHORDS.forEach(chordType => {
                         const fileKey = `${midi}-${chordType}`; // Clau única pel cache
-                        const fileURL = getFileName(midi, chordType); // Ús de la URL amb 's'
+                        const fileURL = getFileName(midi, chordType); // Ús de la URL amb 's' i la carpeta 'audios'
 
                         const audio = new Audio(fileURL);
                         audioCache[fileKey] = audio; 
 
                         audio.oncanplaythrough = () => onLoaded(false, fileURL);
                         audio.onerror = (e) => {
-                            failedFiles.push(fileURL);
-                            onLoaded(true, fileURL); 
+                            // Utilitzem un petit retard per assegurar-nos que l'error es registra correctament
+                            setTimeout(() => {
+                                failedUrls.push(fileURL); 
+                                onLoaded(true, fileURL); 
+                            }, 50); 
                         };
-                        // L'element Audio ha de fer una crida explícita a .load() per forçar la precàrrega
                         audio.load();
                     });
                 }
@@ -415,12 +407,15 @@
                 })
                 .catch((error) => {
                     gameState.isAudioReady = false;
+                    
                     let message = `No s'han pogut carregar ${error.errorCount} arxius d'acord.`;
-                    if (error.failedFiles.length > 0) {
-                        // Mostrem el nom de l'arxiu buscat (amb 's') per a que l'usuari el pugui comprovar
-                        const fileNameWithS = error.failedFiles[0].replace(AUDIO_PATH, '');
-                        message += ` Primer arxiu fallit (buscat): ${fileNameWithS}`;
+                    
+                    // Mostrem l'URL exacta del primer error per a depuració
+                    if (error.failedUrls.length > 0) {
+                        const failedUrl = error.failedUrls[0];
+                        message += ` Primer URL buscat: ${failedUrl}`;
                     }
+                    
                     showAudioErrorPopup(message);
                     elements.loadingOverlay.classList.add('hidden');
                     screens.difficulty.classList.remove('opacity-0');
@@ -431,7 +426,7 @@
             const popup = elements.audioErrorPopup;
             elements.audioErrorMessage.textContent = message;
             popup.classList.remove('hidden');
-            setTimeout(hideAudioErrorPopup, 10000); 
+            setTimeout(hideAudioErrorPopup, 15000); // 15 segons de visibilitat
         }
 
         function hideAudioErrorPopup() {
@@ -457,7 +452,7 @@
                  audio.currentTime = 0; 
                  // Intentar reproduir, capturant possibles errors de política d'àudio
                  audio.play().catch(e => {
-                    if (e.name === "NotAllowedError") {
+                    if (e.name === "NotAllowedError" || e.name === "AbortError") {
                         elements.feedbackMessage.textContent = '🔊 Permet la reproducció automàtica o fes clic a Play.';
                         elements.feedbackMessage.classList.add('text-yellow-400');
                     }
@@ -476,7 +471,7 @@
 
 
         // ===============================================
-        // LÒGICA DEL JOC (ADAPTAT PER ACORDS)
+        // LÒGICA DEL JOC 
         // ===============================================
 
         function showScreen(screenId) {
