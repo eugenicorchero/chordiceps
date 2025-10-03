@@ -216,34 +216,17 @@
         const ALL_CHORDS = Object.keys(CHORD_ABBREVIATIONS);
         
         // NOU ARRAY: ORDRE DE VISUALITZACIÓ DELS BOTONS
-        // Utilitzem les claus dels fitxers per mantenir l'ordre intern correcte,
-        // garantint la nomenclatura sol·licitada (Maj, Men, Aug, Dism, Maj Maj7, Men 7, etc.)
         const CHORD_DISPLAY_ORDER = [
             'Maj',    // Major
             'Men',    // Menor
             'Aug',    // Augmentat
             'Dim',    // Disminuït
-            'AugM7',  // Augmentat Maj7 (Aug M7) - Utilitzem AugM7 (Nom de l'arxiu)
-            'Maj7',   // Major Maj7 (Maj 7) - Utilitzem Maj7 (Nom de l'arxiu)
-            'Men7',   // Menor 7 (Men 7)
-            'Dim7',   // Disminuït 7 (Dism 7)
-            'Dom7',   // Setena de Dominant (Dom 7) - Si es vol 'Maj 7', caldrà canviar 'Dom7' per 'Maj7' als noms de fitxers si el fitxer Dom7 no existeix.
-                      // Basant-me en la teva llista d'abreviacions anteriorment proposada: Maj Maj7, Men 7, Major 7, Dism 7, Aug Maj7, 
-                      // assumeixo que els 9 tipus de fitxer són els definits per ALL_CHORDS (Maj, Men, Aug, Dim, Maj7, Dom7, Men7, Dim7, AugM7).
-                      // Per complir amb l'ordre visual i la nomenclatura, cal assignar correctament els fitxers:
-                      // 'Maj7' es mostra com 'Maj 7' (Setena Major)
-                      // 'Men7' es mostra com 'Men 7' (Setena Menor)
-                      // 'Dom7' es mostra com 'Dom 7' (Setena de Dominant)
-                      // L'ordre sol·licitat sembla barrejar setenes majors/menors amb els noms dels fitxers, així que mantinc la lògica de 9 tipus d'acord diferents:
-                      // 1. Maj, 2. Men, 3. Aug, 4. Dim
-                      // 5. Maj7 (Maj 7), 6. Men7 (Men 7), 7. Dom7 (Dom 7), 8. Dim7 (Dism 7), 9. AugM7 (Aug M7)
-                      
-                      // ** RE-INTERPRETACIÓ de l'ordre sol·licitat vs. Fitxers disponibles (Maj, Men, Aug, Dim, Maj7, Dom7, Men7, Dim7, AugM7) **
-                      // Sol·licitat: [Major, Menor, Augmentat, Disminuït, Major Maj7, Menor 7, Major 7, Disminuït 7, Augmentat Maj7]
-                      // Utilitzarem l'ordre de les claus de fitxer que s'aproximen més a la teva sol·licitud:
-                      // 'Maj', 'Men', 'Aug', 'Dim', 'AugM7', 'Maj7', 'Men7', 'Dim7', 'Dom7'
+            'AugM7',  // Augmentat Maj7 
+            'Maj7',   // Major 7 
+            'Men7',   // Menor 7 
+            'Dim7',   // Disminuït 7 
+            'Dom7',   // Setena de Dominant 
         ];
-        // Nota: Aquesta ordre cobreix els 9 acords de la dificultat "Difícil".
         
         
         // CONFIGURACIÓ DELS NIVELLS DE DIFICULTAT (UTILITZANT ELS NOMS DELS FITXERS)
@@ -307,7 +290,7 @@
         /**
          * Converteix un número MIDI a nom de FONAMENTAL (ex: 48 -> C3).
          * @param {number} midiNumber - El número MIDI de la fonamental.
-         * @returns {string} El nom de la nota amb octava (ex: C3, D#3).
+         * @returns {string} El nom de la nota amb octava (ex: C3, C#3).
          */
         function getRootName(midiNumber) {
             const notesMap = [
@@ -317,7 +300,7 @@
             const noteIndex = midiNumber % 12;
             const finalNoteName = notesMap[noteIndex];
             
-            // Retorna la Fonamental amb l'Octava
+            // Retorna la Fonamental amb l'Octava, mantenint el '#'
             return `${finalNoteName}${octave}`;
         }
         
@@ -325,10 +308,12 @@
          * Genera el nom complet del fitxer d'àudio per a la precàrrega.
          * @param {number} midiNumber - El número MIDI de la fonamental (C3-B3).
          * @param {string} chordType - El tipus d'acord (ex: 'Maj', 'Dim7').
-         * @returns {string} La URL completa (ex: ./audio/C3-Maj.mp3).
+         * @returns {string} La URL completa (ex: ./audio/C#3-Maj.mp3).
          */
         function getFileName(midiNumber, chordType) {
-            const rootName = getRootName(midiNumber).replace('#', 's'); // Utilitzem 's' pel sostingut en l'arxiu (ex: C#3 -> Cs3)
+            // *** CANVI AQUÍ: UTILITZEM DIRECTAMENT EL NOM AMB '#' ***
+            const rootName = getRootName(midiNumber); 
+            // La nomenclatura esperada és ara: C3-Maj.mp3, C#3-Maj.mp3, etc.
             return `${AUDIO_PATH}${rootName}-${chordType}.mp3`;
         }
         
@@ -378,7 +363,7 @@
                     ALL_CHORDS.forEach(chordType => {
                         const fileKey = `${midi}-${chordType}`; // Clau única pel cache
                         // La nomenclatura dels arxius que utilitzem en la llista:
-                        const fileName = `${AUDIO_PATH}${getRootName(midi).replace('#', 's')}-${chordType}.mp3`;
+                        const fileName = getFileName(midi, chordType); // Ús de la nova funció que manté '#'
 
                         const audio = new Audio(fileName);
                         audioCache[fileKey] = audio; 
@@ -559,6 +544,7 @@
             elements.playButton.disabled = !gameState.isAudioReady;
             elements.playButton.classList.remove('opacity-50');
             
+            // Mostrar la fonamental amb '#'
             elements.directionLabel.textContent = `Reconeix l'Acord (Fonamental: ${getRootName(gameState.baseNoteMIDI)})`;
             
             // 2. Genera els botons d'opció UTILITZANT NOMÉS ELS TIPUS D'ACORD D'AQUEST NIVELL
