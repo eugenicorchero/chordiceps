@@ -300,21 +300,29 @@
             const noteIndex = midiNumber % 12;
             const finalNoteName = notesMap[noteIndex];
             
-            // Retorna la Fonamental amb l'Octava, mantenint el '#'
+            // Retorna la Fonamental amb l'Octava, mantenint el '#' per a la lògica interna
             return `${finalNoteName}${octave}`;
         }
         
         /**
-         * Genera el nom complet del fitxer d'àudio per a la precàrrega.
+         * Genera la URL completa del fitxer d'àudio.
+         * Codifica el caràcter '#' a '%23' per evitar errors a la URL.
          * @param {number} midiNumber - El número MIDI de la fonamental (C3-B3).
          * @param {string} chordType - El tipus d'acord (ex: 'Maj', 'Dim7').
-         * @returns {string} La URL completa (ex: ./audio/C#3-Maj.mp3).
+         * @returns {string} La URL completa codificada (ex: ./audio/C%233-Maj.mp3).
          */
         function getFileName(midiNumber, chordType) {
-            // *** CANVI AQUÍ: UTILITZEM DIRECTAMENT EL NOM AMB '#' ***
-            const rootName = getRootName(midiNumber); 
-            // La nomenclatura esperada és ara: C3-Maj.mp3, C#3-Maj.mp3, etc.
-            return `${AUDIO_PATH}${rootName}-${chordType}.mp3`;
+            const rootName = getRootName(midiNumber); // Ex: "C#3"
+            
+            // 1. Construeix el nom del fitxer sense codificació
+            const rawFileName = `${rootName}-${chordType}.mp3`;
+            
+            // 2. Codifica la part del nom que pot contenir el caràcter '#'
+            // encodeURIComponent converteix '#' a '%23'
+            const encodedName = rawFileName.replace(/#/g, '%23');
+            
+            // 3. Retorna la URL completa
+            return `${AUDIO_PATH}${encodedName}`;
         }
         
         /**
@@ -329,7 +337,7 @@
                 let errors = 0;
                 let failedFiles = [];
 
-                const onLoaded = (isError) => {
+                const onLoaded = (isError, fileName) => {
                     filesLoaded++;
                     if (isError) errors++;
                     
@@ -342,7 +350,6 @@
                             console.log("Precàrrega OK: Tots els fitxers d'acord s'han trobat.");
                             resolve();
                         } else {
-                            // No s'ha pogut carregar algun fitxer (potser n'hi ha menys del total de 96)
                             console.warn(`Precàrrega: ${errors} fitxers fallits. Continuant si la majoria estan OK.`);
                             
                             // Si hi ha menys del 90% d'errors, assumim que el nivell fàcil podrà funcionar.
@@ -362,17 +369,16 @@
                 for (let midi = MIDI_START; midi <= MIDI_END; midi++) {
                     ALL_CHORDS.forEach(chordType => {
                         const fileKey = `${midi}-${chordType}`; // Clau única pel cache
-                        // La nomenclatura dels arxius que utilitzem en la llista:
-                        const fileName = getFileName(midi, chordType); // Ús de la nova funció que manté '#'
+                        const fileURL = getFileName(midi, chordType); // Ús de la URL codificada
 
-                        const audio = new Audio(fileName);
+                        const audio = new Audio(fileURL);
                         audioCache[fileKey] = audio; 
 
-                        audio.oncanplaythrough = () => onLoaded(false);
+                        audio.oncanplaythrough = () => onLoaded(false, fileURL);
                         audio.onerror = (e) => {
-                            // console.error(`Error de càrrega per a l'acord ${fileKey} (${fileName}).`, e);
-                            failedFiles.push(fileName);
-                            onLoaded(true); 
+                            // console.error(`Error de càrrega per a l'acord ${fileKey} (${fileURL}).`, e);
+                            failedFiles.push(fileURL);
+                            onLoaded(true, fileURL); 
                         };
                         audio.load();
                     });
@@ -396,7 +402,9 @@
                     gameState.isAudioReady = false;
                     let message = `No s'han pogut carregar ${error.errorCount} arxius d'acord.`;
                     if (error.failedFiles.length > 0) {
-                        message += ` Primer arxiu fallit: ${error.failedFiles[0]}`;
+                        // Mostrem el nom intern (amb #) per a que l'usuari el pugui comprovar
+                        const internalFileName = error.failedFiles[0].replace(AUDIO_PATH, '').replace(/%23/g, '#');
+                        message += ` Primer arxiu fallit (buscat): ${internalFileName}`;
                     }
                     showAudioErrorPopup(message);
                     elements.loadingOverlay.classList.add('hidden');
@@ -504,10 +512,10 @@
 
                 fileKey = `${rootMIDI}-${chordType}`;
                 attempts++;
-            } while (!audioCache[fileKey] || attempts > MAX_ATTEMPTS); // Intentar fins a 50 vegades
+            } while (!audioCache[fileKey] && attempts < MAX_ATTEMPTS); 
 
-            if (attempts > MAX_ATTEMPTS) {
-                console.error("No s'ha pogut trobar un arxiu d'acord vàlid al cache després de molts intents.");
+            if (attempts >= MAX_ATTEMPTS) {
+                console.error("No s'ha pogut trobar un arxiu d'acord vàlid al cache després de molts intents. Revisar el cache d'àudio.");
                 // Fallback a un acord conegut si la precàrrega va fallar en tots
                 return { correctChordType: 'Maj', baseNoteMIDI: 48, label: 'Maj' }; 
             }
