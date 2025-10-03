@@ -72,7 +72,7 @@
     <div id="audioErrorPopup" class="audio-error-popup hidden bg-red-600 text-white p-3 rounded-lg shadow-xl max-w-xs transition duration-300 transform scale-100">
         <p class="font-bold mb-1">⚠️ Error de Precàrrega</p>
         <p id="audioErrorMessage" class="text-sm">No s'han pogut carregar tots els fitxers d'acord.</p>
-        <p class="text-xs mt-1 opacity-80">Assegura't que el path i la nomenclatura dels arxius sigui correcta (ex: C3-Maj.mp3, F#3-Men7.mp3).</p>
+        <p class="text-xs mt-1 opacity-80">Assegura't que el path i la nomenclatura dels arxius sigui correcta (ex: **C3-Maj.mp3, Cs3-Men7.mp3**).</p>
     </div>
 
     <!-- Contenidor principal de l'aplicació: Fosc i amb ombra subtil -->
@@ -206,11 +206,11 @@
             'Men': 'Men',           
             'Aug': 'Aug',           
             'Dim': 'Dism',          
-            'Maj7': 'Maj 7',        // Setena Major
-            'Dom7': 'Dom 7',        // Setena de Dominant (Utilitzem Dom7 per al fitxer, però es pot reanomenar si el fitxer és un altre)
-            'Men7': 'Men 7',        // Setena Menor
-            'Dim7': 'Dism 7',       // Setena Disminuïda
-            'AugM7': 'Aug M7'       // Setena Major Augmentada 
+            'Maj7': 'Maj 7',        
+            'Dom7': 'Dom 7',        
+            'Men7': 'Men 7',        
+            'Dim7': 'Dism 7',       
+            'AugM7': 'Aug M7'       
         };
 
         const ALL_CHORDS = Object.keys(CHORD_ABBREVIATIONS);
@@ -250,7 +250,6 @@
             correctChordType: null, // Exemple: 'Maj', 'Men7', 'Dim'
             timer: null,
             timeRemaining: TIMER_DURATION,
-            // currentDirection: null, // No cal per als acords
             isAnswered: false,
             baseNoteMIDI: null, // La fonamental (root) de l'acord
             currentChordLabel: null, // Nom de l'acord (per al feedback)
@@ -288,11 +287,13 @@
         // ===============================================
         
         /**
-         * Converteix un número MIDI a nom de FONAMENTAL (ex: 48 -> C3).
+         * Converteix un número MIDI a nom de FONAMENTAL. 
+         * Important: Utilitza '#' per a la visualització, però no per als noms d'arxiu.
          * @param {number} midiNumber - El número MIDI de la fonamental.
          * @returns {string} El nom de la nota amb octava (ex: C3, C#3).
          */
         function getRootName(midiNumber) {
+            // Aquest map s'utilitza per a la VISUALITZACIÓ (C#3)
             const notesMap = [
                 'C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'
             ];
@@ -300,29 +301,41 @@
             const noteIndex = midiNumber % 12;
             const finalNoteName = notesMap[noteIndex];
             
-            // Retorna la Fonamental amb l'Octava, mantenint el '#' per a la lògica interna
             return `${finalNoteName}${octave}`;
         }
         
         /**
+         * Genera el nom de la FONAMENTAL utilitzant 's' en lloc de '#'.
+         * @param {number} midiNumber - El número MIDI de la fonamental (C3-B3).
+         * @returns {string} El nom de l'arxiu de la nota (ex: C3, Cs3, Ds3).
+         */
+        function getFileRootName(midiNumber) {
+            // Aquest map s'utilitza per al NOM DE L'ARXIU (Cs3)
+            const fileNotesMap = [
+                'C', 'Cs', 'D', 'Ds', 'E', 'F', 'Fs', 'G', 'Gs', 'A', 'As', 'B'
+            ];
+            const octave = Math.floor(midiNumber / 12) - 1;
+            const noteIndex = midiNumber % 12;
+            const finalFileNoteName = fileNotesMap[noteIndex];
+            
+            return `${finalFileNoteName}${octave}`;
+        }
+
+        /**
          * Genera la URL completa del fitxer d'àudio.
-         * Codifica el caràcter '#' a '%23' per evitar errors a la URL.
+         * Utilitza la nomenclatura amb 's' per als sostinguts.
          * @param {number} midiNumber - El número MIDI de la fonamental (C3-B3).
          * @param {string} chordType - El tipus d'acord (ex: 'Maj', 'Dim7').
-         * @returns {string} La URL completa codificada (ex: ./audio/C%233-Maj.mp3).
+         * @returns {string} La URL completa (ex: ./audio/Cs3-Maj.mp3).
          */
         function getFileName(midiNumber, chordType) {
-            const rootName = getRootName(midiNumber); // Ex: "C#3"
+            const rootName = getFileRootName(midiNumber); // Ex: "Cs3" o "C3"
             
-            // 1. Construeix el nom del fitxer sense codificació
+            // Construeix el nom del fitxer
             const rawFileName = `${rootName}-${chordType}.mp3`;
             
-            // 2. Codifica la part del nom que pot contenir el caràcter '#'
-            // encodeURIComponent converteix '#' a '%23'
-            const encodedName = rawFileName.replace(/#/g, '%23');
-            
-            // 3. Retorna la URL completa
-            return `${AUDIO_PATH}${encodedName}`;
+            // No cal codificar, ja que 's' no és un caràcter problemàtic
+            return `${AUDIO_PATH}${rawFileName}`;
         }
         
         /**
@@ -339,7 +352,10 @@
 
                 const onLoaded = (isError, fileName) => {
                     filesLoaded++;
-                    if (isError) errors++;
+                    if (isError) {
+                        errors++;
+                        console.warn(`Fallada en carregar: ${fileName}`);
+                    }
                     
                     const percentage = Math.round((filesLoaded / totalFilesToLoad) * 100);
                     elements.preloaderBar.style.width = `${percentage}%`;
@@ -350,16 +366,16 @@
                             console.log("Precàrrega OK: Tots els fitxers d'acord s'han trobat.");
                             resolve();
                         } else {
-                            console.warn(`Precàrrega: ${errors} fitxers fallits. Continuant si la majoria estan OK.`);
+                            console.warn(`Precàrrega finalitzada amb ${errors} fitxers fallits.`);
                             
-                            // Si hi ha menys del 90% d'errors, assumim que el nivell fàcil podrà funcionar.
+                            // Si hi ha massa errors, rebutgem per mostrar l'alerta
                             if (errors > totalFilesToLoad * 0.9) { 
                                 reject({
                                     errorCount: errors,
                                     failedFiles: failedFiles
                                 });
                             } else {
-                                resolve(); // Si només falta algun fitxer del nivell Hard, seguim.
+                                resolve(); // Si la majoria estan bé, continuem
                             }
                         }
                     }
@@ -369,17 +385,17 @@
                 for (let midi = MIDI_START; midi <= MIDI_END; midi++) {
                     ALL_CHORDS.forEach(chordType => {
                         const fileKey = `${midi}-${chordType}`; // Clau única pel cache
-                        const fileURL = getFileName(midi, chordType); // Ús de la URL codificada
+                        const fileURL = getFileName(midi, chordType); // Ús de la URL amb 's'
 
                         const audio = new Audio(fileURL);
                         audioCache[fileKey] = audio; 
 
                         audio.oncanplaythrough = () => onLoaded(false, fileURL);
                         audio.onerror = (e) => {
-                            // console.error(`Error de càrrega per a l'acord ${fileKey} (${fileURL}).`, e);
                             failedFiles.push(fileURL);
                             onLoaded(true, fileURL); 
                         };
+                        // L'element Audio ha de fer una crida explícita a .load() per forçar la precàrrega
                         audio.load();
                     });
                 }
@@ -396,15 +412,14 @@
                     hideAudioErrorPopup();
                     elements.loadingOverlay.classList.add('hidden');
                     screens.difficulty.classList.remove('opacity-0');
-                    console.log("Precàrrega completa. Àudio preparat.");
                 })
                 .catch((error) => {
                     gameState.isAudioReady = false;
                     let message = `No s'han pogut carregar ${error.errorCount} arxius d'acord.`;
                     if (error.failedFiles.length > 0) {
-                        // Mostrem el nom intern (amb #) per a que l'usuari el pugui comprovar
-                        const internalFileName = error.failedFiles[0].replace(AUDIO_PATH, '').replace(/%23/g, '#');
-                        message += ` Primer arxiu fallit (buscat): ${internalFileName}`;
+                        // Mostrem el nom de l'arxiu buscat (amb 's') per a que l'usuari el pugui comprovar
+                        const fileNameWithS = error.failedFiles[0].replace(AUDIO_PATH, '');
+                        message += ` Primer arxiu fallit (buscat): ${fileNameWithS}`;
                     }
                     showAudioErrorPopup(message);
                     elements.loadingOverlay.classList.add('hidden');
@@ -451,7 +466,6 @@
 
             try {
                 resetAndPlay(audio);
-                // console.log(`Reproduint: ${gameState.currentChordLabel} sobre ${getRootName(gameState.baseNoteMIDI)}.`);
             } catch(e) {
                  console.error("Error crític de reproducció:", e);
                  elements.feedbackMessage.textContent = 'Error de reproducció inesperat.';
@@ -552,7 +566,7 @@
             elements.playButton.disabled = !gameState.isAudioReady;
             elements.playButton.classList.remove('opacity-50');
             
-            // Mostrar la fonamental amb '#'
+            // Mostrar la fonamental amb '#' (Per a la visualització, ja que és l'estàndard musical)
             elements.directionLabel.textContent = `Reconeix l'Acord (Fonamental: ${getRootName(gameState.baseNoteMIDI)})`;
             
             // 2. Genera els botons d'opció UTILITZANT NOMÉS ELS TIPUS D'ACORD D'AQUEST NIVELL
@@ -580,13 +594,12 @@
             elements.intervalOptions.innerHTML = ''; 
             
             // 1. Filtrem l'ordre de visualització global (CHORD_DISPLAY_ORDER)
-            // per incloure només els acords disponibles en la dificultat actual.
             const orderedOptions = CHORD_DISPLAY_ORDER.filter(key => availableOptions.includes(key));
 
             // 2. Mapegem les claus a les dades per als botons
             const buttonsData = orderedOptions.map(key => ({
                 key: key, 
-                label: CHORD_ABBREVIATIONS[key] // Utilitzem l'abreviatura
+                label: CHORD_ABBREVIATIONS[key] 
             }));
             
             // 3. Creem els botons en l'ordre establert
@@ -604,13 +617,10 @@
             let gridLayout = 'repeat(auto-fit, minmax(120px, 1fr))';
             
             if (numOptions > 6) {
-                 // Per a 9 opcions, el minmax de 100px garanteix que s'adapti bé a mòbil i que en desktop estigui equilibrat
                 gridLayout = 'repeat(auto-fit, minmax(100px, 1fr))'; 
             } else if (numOptions > 4) {
-                 // Per a 4 opcions (Mitjà), mantenim 2 columnes en pantalles petites, 4 en grans
                 gridLayout = 'repeat(auto-fit, minmax(120px, 1fr))';
             }
-            // En pantalles molt grans, Tailwind ho gestionarà bé amb el 'gap-3' i els 'px-4'
             elements.intervalOptions.style.gridTemplateColumns = gridLayout;
         }
 
