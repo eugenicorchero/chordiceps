@@ -109,7 +109,7 @@
                 </button>
                 <button onclick="startGame('hard')" class="difficulty-button text-white font-semibold rounded-lg hover:brightness-110 p-6 flex flex-col items-center text-center">
                     <span class="text-xl font-bold mb-2">Difícil (Tríades i Setenes)</span>
-                    <!-- ACTUALITZAT per incloure m7b5 (Semidisminuït) -->
+                    <!-- Text actualitzat per reflectir els 10 acords -->
                     <span class="text-sm opacity-90">Acords: Tots els 10 tipus, incloent Semidisminuït.</span> 
                 </button>
             </div>
@@ -198,7 +198,6 @@
         const audioCache = {};
         
         // ABREVIATURES D'ACORD (Clau: Nom del fitxer MP3; Valor: Text del botó)
-        // [MODIFICACIÓ CLAU 1: AFegir M7b5]
         const CHORD_ABBREVIATIONS = {
             'Maj': 'Maj',           
             'Men': 'Men',           
@@ -206,16 +205,16 @@
             'Dim': 'Dism',          
             'Maj7': 'Maj 7',        
             'Dom7': 'Dom 7',        
-            'Men7': 'Men 7',        
-            'M7b5': 'm7b5',       // Clau del fitxer: M7b5 (per min7b5) | Text del botó: m7b5
+            'Men7': 'Men 7',
+            // [NOU] Clau 'm7b5' per a una millor coherència musical amb els arxius.
+            'm7b5': 'm7b5',       
             'Dim7': 'Dism 7',       
             'AugM7': 'Aug M7'       
         };
 
-        const ALL_CHORDS = Object.keys(CHORD_ABBREVIATIONS); // S'actualitza automàticament (10 acords)
+        const ALL_CHORDS = Object.keys(CHORD_ABBREVIATIONS); 
         
         // NOU ARRAY: ORDRE DE VISUALITZACIÓ DELS BOTONS
-        // [MODIFICACIÓ CLAU 2: Col·locar M7b5 en l'ordre de visualització]
         const CHORD_DISPLAY_ORDER = [
             'Maj',    
             'Men',    
@@ -225,13 +224,12 @@
             'Maj7',   
             'Men7',   
             'Dom7',   
-            'M7b5',   // Semidisminuït
-            'Dim7',   // Disminuït 7
+            'm7b5',   // [NOU] Usant la clau 'm7b5'
+            'Dim7',   
         ];
         
         
         // CONFIGURACIÓ DELS NIVELLS DE DIFICULTAT
-        // [MODIFICACIÓ CLAU 3: Afegir M7b5 al nivell 'hard']
         const DIFFICULTY_CONFIG = {
             easy: {
                 chords: ['Maj', 'Men'], 
@@ -323,7 +321,7 @@
         function getFileName(midiNumber, chordType) {
             const rootName = getFileRootName(midiNumber); 
             
-            // La part de l'acord (ex: Maj, M7b5) ha de coincidir exactament.
+            // La part de l'acord (ex: Maj, m7b5) ha de coincidir exactament amb la clau.
             const rawFileName = `${rootName}-${chordType}.mp3`;
             
             return `${AUDIO_PATH}${rawFileName}`;
@@ -331,12 +329,11 @@
         
         /**
          * Precàrrega (Pre-load) de tots els fitxers d'àudio segons la configuració total.
-         * Ara intentarà carregar 12 fonamentals * 10 tipus d'acord = 120 fitxers.
          */
         function preloadAllAudio() {
             return new Promise((resolve, reject) => {
-                const totalChords = ALL_CHORDS.length; // Ara és 10
-                const totalFilesToLoad = TOTAL_MIDI_ROOTS * totalChords; // Ara és 120
+                const totalChords = ALL_CHORDS.length; 
+                const totalFilesToLoad = TOTAL_MIDI_ROOTS * totalChords; 
                 
                 let filesLoaded = 0;
                 let errors = 0;
@@ -726,7 +723,9 @@
             elements.playButton.onclick = playChord; // Reprodueix l'acord actual
 
             elements.nextRoundButton.onclick = () => {
-                if (gameState.round >= 10) { // Limitem a 10 rondes per al joc
+                // [MODIFICAT] Limitem a 20 rondes per al joc
+                const MAX_ROUNDS = 20; 
+                if (gameState.round >= MAX_ROUNDS) { 
                     endGame();
                 } else {
                     loadNextRound();
