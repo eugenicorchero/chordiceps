@@ -107,10 +107,11 @@
                     <span class="text-xl font-bold mb-2">Mitjà (Totes les Tríades)</span>
                     <span class="text-sm opacity-90">Acords: Maj, Men, Aug, Dism.</span>
                 </button>
+                <!-- Botó Difícil amb la llista completa dels 10 acords -->
                 <button onclick="startGame('hard')" class="difficulty-button text-white font-semibold rounded-lg hover:brightness-110 p-6 flex flex-col items-center text-center">
-                    <span class="text-xl font-bold mb-2">Difícil (Tríades i Setenes)</span>
-                    <!-- Text actualitzat per reflectir els 10 acords -->
-                    <span class="text-sm opacity-90">Acords: Tots els 10 tipus, incloent Semidisminuït.</span> 
+                    <span class="text-xl font-bold mb-2">Difícil (Tots els 10 Acords)</span>
+                    <!-- Aquesta etiqueta serà omplerta pel JavaScript a window.onload -->
+                    <span id="hardChordsList" class="text-sm opacity-90">Carregant llista d'acords...</span> 
                 </button>
             </div>
         </div>
@@ -206,7 +207,6 @@
             'Maj7': 'Maj 7',        
             'Dom7': 'Dom 7',        
             'Men7': 'Men 7',
-            // [NOU] Clau 'm7b5' per a una millor coherència musical amb els arxius.
             'm7b5': 'm7b5',       
             'Dim7': 'Dism 7',       
             'AugM7': 'Aug M7'       
@@ -224,7 +224,7 @@
             'Maj7',   
             'Men7',   
             'Dom7',   
-            'm7b5',   // [NOU] Usant la clau 'm7b5'
+            'm7b5',   
             'Dim7',   
         ];
         
@@ -279,6 +279,8 @@
             preloaderBar: document.getElementById('preloaderBar'),
             preloaderStatus: document.getElementById('preloaderStatus'),
             debugNotes: document.getElementById('debugNotes'),
+            // [NOU] Referència al llistat d'acords de dificultat "Difícil"
+            hardChordsList: document.getElementById('hardChordsList'), 
         };
 
 
@@ -397,6 +399,7 @@
                     hideAudioErrorPopup();
                     elements.loadingOverlay.classList.add('hidden');
                     screens.difficulty.classList.remove('opacity-0');
+                    initializeHardChordsList(); // [NOU] Inicialització de la llista d'acords
                 })
                 .catch((error) => {
                     gameState.isAudioReady = false;
@@ -411,6 +414,7 @@
                     showAudioErrorPopup(message);
                     elements.loadingOverlay.classList.add('hidden');
                     screens.difficulty.classList.remove('opacity-0');
+                    initializeHardChordsList(); // [NOU] També l'inicialitzem en cas d'error.
                 });
         }
 
@@ -464,6 +468,22 @@
         // ===============================================
         // LÒGICA DEL JOC 
         // ===============================================
+        
+        /**
+         * [NOVA FUNCIÓ] Genera la llista d'acords per a la descripció del nivell Difícil.
+         */
+        function initializeHardChordsList() {
+            const hardChordsKeys = DIFFICULTY_CONFIG.hard.chords;
+            
+            // Map the file keys to the display labels and join them
+            const chordLabels = hardChordsKeys.map(key => CHORD_ABBREVIATIONS[key]);
+            
+            // Format: Maj, Men, Aug, Dism, Maj 7, Dom 7, Men 7, m7b5, Dism 7, Aug M7
+            const listText = chordLabels.join(', ');
+            
+            elements.hardChordsList.textContent = `Acords: ${listText}`;
+        }
+
 
         function showScreen(screenId) {
             Object.values(screens).forEach(screen => screen.classList.add('hidden'));
@@ -723,7 +743,6 @@
             elements.playButton.onclick = playChord; // Reprodueix l'acord actual
 
             elements.nextRoundButton.onclick = () => {
-                // [MODIFICAT] Limitem a 20 rondes per al joc
                 const MAX_ROUNDS = 20; 
                 if (gameState.round >= MAX_ROUNDS) { 
                     endGame();
