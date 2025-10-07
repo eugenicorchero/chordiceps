@@ -109,7 +109,8 @@
                 </button>
                 <button onclick="startGame('hard')" class="difficulty-button text-white font-semibold rounded-lg hover:brightness-110 p-6 flex flex-col items-center text-center">
                     <span class="text-xl font-bold mb-2">Difícil (Tríades i Setenes)</span>
-                    <span class="text-sm opacity-90">Acords: Maj, Men, Aug, Dism, Maj 7, Dom 7, Men 7, Dism 7, Aug M7.</span>
+                    <!-- ACTUALITZAT per incloure m7b5 (Semidisminuït) -->
+                    <span class="text-sm opacity-90">Acords: Tots els 10 tipus, incloent Semidisminuït.</span> 
                 </button>
             </div>
         </div>
@@ -197,6 +198,7 @@
         const audioCache = {};
         
         // ABREVIATURES D'ACORD (Clau: Nom del fitxer MP3; Valor: Text del botó)
+        // [MODIFICACIÓ CLAU 1: AFegir M7b5]
         const CHORD_ABBREVIATIONS = {
             'Maj': 'Maj',           
             'Men': 'Men',           
@@ -205,27 +207,31 @@
             'Maj7': 'Maj 7',        
             'Dom7': 'Dom 7',        
             'Men7': 'Men 7',        
+            'M7b5': 'm7b5',       // Clau del fitxer: M7b5 (per min7b5) | Text del botó: m7b5
             'Dim7': 'Dism 7',       
             'AugM7': 'Aug M7'       
         };
 
-        const ALL_CHORDS = Object.keys(CHORD_ABBREVIATIONS);
+        const ALL_CHORDS = Object.keys(CHORD_ABBREVIATIONS); // S'actualitza automàticament (10 acords)
         
         // NOU ARRAY: ORDRE DE VISUALITZACIÓ DELS BOTONS
+        // [MODIFICACIÓ CLAU 2: Col·locar M7b5 en l'ordre de visualització]
         const CHORD_DISPLAY_ORDER = [
-            'Maj',    // Major
-            'Men',    // Menor
-            'Aug',    // Augmentat
-            'Dim',    // Disminuït
-            'AugM7',  // Augmentat Maj7 
-            'Maj7',   // Major 7 
-            'Men7',   // Menor 7 
-            'Dim7',   // Disminuït 7 
-            'Dom7',   // Setena de Dominant 
+            'Maj',    
+            'Men',    
+            'Aug',    
+            'Dim',    
+            'AugM7',  
+            'Maj7',   
+            'Men7',   
+            'Dom7',   
+            'M7b5',   // Semidisminuït
+            'Dim7',   // Disminuït 7
         ];
         
         
-        // CONFIGURACIÓ DELS NIVELLS DE DIFICULTAT (UTILITZANT ELS NOMS DELS FITXERS)
+        // CONFIGURACIÓ DELS NIVELLS DE DIFICULTAT
+        // [MODIFICACIÓ CLAU 3: Afegir M7b5 al nivell 'hard']
         const DIFFICULTY_CONFIG = {
             easy: {
                 chords: ['Maj', 'Men'], 
@@ -234,7 +240,7 @@
                 chords: ['Maj', 'Men', 'Aug', 'Dim'], 
             },
             hard: {
-                chords: ALL_CHORDS, // Tots els 9 tipus
+                chords: ALL_CHORDS, // Ara inclou els 10 acords
             }
         };
         
@@ -243,12 +249,12 @@
             difficulty: null,
             score: 0,
             round: 0,
-            correctChordType: null, // Exemple: 'Maj', 'Men7', 'Dim'
+            correctChordType: null, 
             timer: null,
             timeRemaining: TIMER_DURATION,
             isAnswered: false,
-            baseNoteMIDI: null, // La fonamental (root) de l'acord
-            currentChordLabel: null, // Nom de l'acord (per al feedback)
+            baseNoteMIDI: null, 
+            currentChordLabel: null, 
             isAudioReady: false, 
         };
 
@@ -284,11 +290,8 @@
         
         /**
          * Converteix un número MIDI a nom de FONAMENTAL per a la VISUALITZACIÓ (utilitza #).
-         * @param {number} midiNumber - El número MIDI de la fonamental.
-         * @returns {string} El nom de la nota amb octava (ex: C3, C#3).
          */
         function getRootName(midiNumber) {
-            // Aquest map s'utilitza per a la VISUALITZACIÓ (C#3)
             const notesMap = [
                 'C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'
             ];
@@ -300,13 +303,10 @@
         }
         
         /**
-         * Genera el nom de la FONAMENTAL utilitzant 's' en lloc de '#'.
-         * AQUEST NOM S'UTILITZA PER ALS FITXERS.
-         * @param {number} midiNumber - El número MIDI de la fonamental (C3-B3).
-         * @returns {string} El nom de l'arxiu de la nota (ex: C3, Cs3, Ds3).
+         * Genera el nom de la FONAMENTAL utilitzant 's' en lloc de '#' (per als FITXERS).
          */
         function getFileRootName(midiNumber) {
-            // ACTUALITZAT: Aquest map utilitza 's' per coincidir amb la nomenclatura dels vostres arxius.
+            // Aquest map utilitza 's' per coincidir amb la nomenclatura dels vostres arxius.
             const fileNotesMap = [
                 'C', 'Cs', 'D', 'Ds', 'E', 'F', 'Fs', 'G', 'Gs', 'A', 'As', 'B'
             ];
@@ -319,14 +319,11 @@
 
         /**
          * Genera la URL completa del fitxer d'àudio.
-         * @param {number} midiNumber - El número MIDI de la fonamental (C3-B3).
-         * @param {string} chordType - El tipus d'acord (ex: 'Maj', 'Dim7').
-         * @returns {string} La URL completa (ex: ./audios/Cs3-Maj.mp3).
          */
         function getFileName(midiNumber, chordType) {
-            const rootName = getFileRootName(midiNumber); // Ex: "Cs3" o "C3"
+            const rootName = getFileRootName(midiNumber); 
             
-            // Construeix el nom del fitxer.
+            // La part de l'acord (ex: Maj, M7b5) ha de coincidir exactament.
             const rawFileName = `${rootName}-${chordType}.mp3`;
             
             return `${AUDIO_PATH}${rawFileName}`;
@@ -334,11 +331,12 @@
         
         /**
          * Precàrrega (Pre-load) de tots els fitxers d'àudio segons la configuració total.
+         * Ara intentarà carregar 12 fonamentals * 10 tipus d'acord = 120 fitxers.
          */
         function preloadAllAudio() {
             return new Promise((resolve, reject) => {
-                const totalChords = ALL_CHORDS.length;
-                const totalFilesToLoad = TOTAL_MIDI_ROOTS * totalChords; // 12 fonamentals * 9 tipus = 108 fitxers
+                const totalChords = ALL_CHORDS.length; // Ara és 10
+                const totalFilesToLoad = TOTAL_MIDI_ROOTS * totalChords; // Ara és 120
                 
                 let filesLoaded = 0;
                 let errors = 0;
@@ -362,7 +360,6 @@
                         } else {
                             console.warn(`Precàrrega finalitzada amb ${errors} fitxers fallits.`);
                             
-                            // Si hi ha errors, rebutgem per mostrar l'alerta
                             reject({
                                 errorCount: errors,
                                 failedUrls: failedUrls
@@ -371,18 +368,17 @@
                     }
                 };
 
-                // Bucle per a TOTES les combinacions possibles
+                // Bucle per a TOTES les combinacions possibles (12 Fonamentals x 10 Acords)
                 for (let midi = MIDI_START; midi <= MIDI_END; midi++) {
                     ALL_CHORDS.forEach(chordType => {
-                        const fileKey = `${midi}-${chordType}`; // Clau única pel cache
-                        const fileURL = getFileName(midi, chordType); // Ús de la URL amb 's' i la carpeta 'audios'
+                        const fileKey = `${midi}-${chordType}`; 
+                        const fileURL = getFileName(midi, chordType); 
 
                         const audio = new Audio(fileURL);
                         audioCache[fileKey] = audio; 
 
                         audio.oncanplaythrough = () => onLoaded(false, fileURL);
                         audio.onerror = (e) => {
-                            // Utilitzem un petit retard per assegurar-nos que l'error es registra correctament
                             setTimeout(() => {
                                 failedUrls.push(fileURL); 
                                 onLoaded(true, fileURL); 
@@ -410,7 +406,6 @@
                     
                     let message = `No s'han pogut carregar ${error.errorCount} arxius d'acord.`;
                     
-                    // Mostrem l'URL exacta del primer error per a depuració
                     if (error.failedUrls.length > 0) {
                         const failedUrl = error.failedUrls[0];
                         message += ` Primer URL buscat: ${failedUrl}`;
@@ -426,7 +421,7 @@
             const popup = elements.audioErrorPopup;
             elements.audioErrorMessage.textContent = message;
             popup.classList.remove('hidden');
-            setTimeout(hideAudioErrorPopup, 15000); // 15 segons de visibilitat
+            setTimeout(hideAudioErrorPopup, 15000); 
         }
 
         function hideAudioErrorPopup() {
@@ -450,7 +445,6 @@
             const resetAndPlay = (audio) => {
                  audio.pause();
                  audio.currentTime = 0; 
-                 // Intentar reproduir, capturant possibles errors de política d'àudio
                  audio.play().catch(e => {
                     if (e.name === "NotAllowedError" || e.name === "AbortError") {
                         elements.feedbackMessage.textContent = '🔊 Permet la reproducció automàtica o fes clic a Play.';
@@ -548,7 +542,7 @@
             
             // Neteja l'estat anterior
             elements.feedbackMessage.textContent = '';
-            elements.feedbackMessage.className = 'mt-6 text-center text-lg font-bold min-h-6'; // Reset classes
+            elements.feedbackMessage.className = 'mt-6 text-center text-lg font-bold min-h-6'; 
             elements.nextRoundButton.classList.add('hidden');
             elements.roundCount.textContent = gameState.round;
             
@@ -556,7 +550,7 @@
             const newChord = generateChord();
             gameState.correctChordType = newChord.correctChordType;
             gameState.baseNoteMIDI = newChord.baseNoteMIDI;
-            gameState.currentChordLabel = newChord.label; // Label amb l'abreviatura
+            gameState.currentChordLabel = newChord.label; 
 
             elements.playButton.disabled = !gameState.isAudioReady;
             elements.playButton.classList.remove('opacity-50');
@@ -611,7 +605,7 @@
             const numOptions = availableOptions.length;
             let gridLayout = 'repeat(auto-fit, minmax(120px, 1fr))';
             
-            if (numOptions > 6) {
+            if (numOptions > 8) { // Més opcions, fem la mida mínima una mica més petita
                 gridLayout = 'repeat(auto-fit, minmax(100px, 1fr))'; 
             } else if (numOptions > 4) {
                 gridLayout = 'repeat(auto-fit, minmax(120px, 1fr))';
