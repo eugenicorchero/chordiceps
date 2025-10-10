@@ -757,5 +757,19 @@
 
     </script>
 
+
+<!-- modifier de carga para los moviles lentos! -->
+<script>
+window.addEventListener('load', () => {
+  setTimeout(() => {
+    // Esperar 7 segundos antes de comprobar los audios
+    if (typeof checkAudioAccessibility === 'function') {
+      checkAudioAccessibility();
+    }
+  }, 7000); // 7000 ms = 7 segundos
+});
+</script>
+
 </body>
 </html>
+
