@@ -759,27 +759,28 @@
 
 
 <!-- modifier de carga para los moviles lentos! -->
-<!-- Pantalla de carga temporal -->
-<div id="delay-preloader"
-     style="position:fixed;inset:0;display:flex;align-items:center;justify-content:center;
-            background-color:#000;color:#fff;font-family:sans-serif;font-size:1.3rem;
-            z-index:99999;">
-  Carregant àudios... si us plau, espera uns segons.
-</div>
 
+    <!-- retardo de 10s -->
 <script>
 window.addEventListener('load', () => {
-  // Espera 7 segons abans d'executar la comprovació d'àudios
   setTimeout(() => {
-    if (typeof checkAudioAccessibility === 'function') {
-      checkAudioAccessibility();
-    }
-    // Després de 7s, amaguem el missatge
-    const preloader = document.getElementById('delay-preloader');
-    if (preloader) preloader.style.display = 'none';
-  }, 7000);
+    if (typeof checkAudioAccessibility === 'function') checkAudioAccessibility();
+  }, 10000); // 10 s en lugar de 7 s
 });
 </script>
+
+    <!-- doble carga por si falla -->
+<script>
+window.addEventListener('load', () => {
+  // primera tanda tras 5 s
+  setTimeout(() => checkAudioAccessibility && checkAudioAccessibility(), 5000);
+  // segunda tanda tras 20 s (refresca los que fallaron)
+  setTimeout(() => checkAudioAccessibility && checkAudioAccessibility(), 20000);
+});
+</script>
+
+
+    
 </body>
 </html>
 
