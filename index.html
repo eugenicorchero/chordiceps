@@ -73,6 +73,10 @@
         <p class="font-bold mb-1">⚠️ Error de Precàrrega</p>
         <p id="audioErrorMessage" class="text-sm">No s'han pogut carregar tots els fitxers d'acord.</p>
         <p class="text-xs mt-1 opacity-80">Revisa la nomenclatura de l'arxiu que no es troba.</p>
+        <div class="mt-2 flex gap-2">
+            <button id="showErrorsBtn" class="bg-white text-red-600 px-3 py-1 rounded">Mostra errors</button>
+            <button id="retryErrorsBtn" class="bg-white text-red-600 px-3 py-1 rounded">Reintenta</button>
+        </div>
     </div>
 
     <!-- Contenidor principal de l'aplicació: Fosc i amb ombra subtil -->
@@ -306,7 +310,7 @@
                 // Try a quick HEAD check (short timeout) to fail fast on 404s/network issues.
                 const p = new Promise((resolve) => {
                     const controller = new AbortController();
-                    const headTimeout = setTimeout(() => controller.abort(), 2500);
+                    const headTimeout = setTimeout(() => controller.abort(), 4000);
 
                     fetch(url, { method: 'HEAD', signal: controller.signal }).then(resp => {
                         clearTimeout(headTimeout);
@@ -695,7 +699,59 @@
             initializeHardChordsList();
             // Mostrem pantalla de dificultat
             screens.difficulty.classList.remove('opacity-0');
+
+            // Hook up error popup buttons
+            const showErrorsBtn = document.getElementById('showErrorsBtn');
+            const retryErrorsBtn = document.getElementById('retryErrorsBtn');
+            if (showErrorsBtn) showErrorsBtn.onclick = () => {
+                const arr = Array.from(audioLoader.failedUrls || []);
+                alert('Failed URLs:\n' + (arr.slice(0,50).join('\n')) + (arr.length > 50 ? `\n... +${arr.length-50} more` : ''));
+            };
+            if (retryErrorsBtn) retryErrorsBtn.onclick = () => {
+                retryFailedUrls();
+            };
         };
+
+        // Retry logic: parse failed URLs and attempt to reload them with low concurrency / backoff
+        function parseUrlToParts(url) {
+            try {
+                const file = url.split('/').pop(); // e.g. Cs3-Maj.mp3
+                const [name] = file.split('.');
+                const dash = name.indexOf('-');
+                const root = name.slice(0, dash);
+                const chord = name.slice(dash+1);
+                // Convert root back to midi: simple parse assuming last char is octave
+                const m = root.match(/^([A-G]s?)(-?\d+)$/);
+                if (!m) return null;
+                const note = m[1]; const octave = parseInt(m[2], 10);
+                const fileNotesMap = {C:0, Cs:1, D:2, Ds:3, E:4, F:5, Fs:6, G:7, Gs:8, A:9, As:10, B:11};
+                if (!(note in fileNotesMap)) return null;
+                const midi = (octave + 1) * 12 + fileNotesMap[note];
+                return { midi, chord };
+            } catch(e) { return null; }
+        }
+
+        async function retryFailedUrls() {
+            const arr = Array.from(audioLoader.failedUrls || []);
+            if (!arr.length) { alert('No failed URLs to retry'); return; }
+            elements.preloaderStatus.textContent = `Reintentant ${arr.length} fitxers...`;
+            // Attempt sequentially with small delay
+            for (let i=0;i<arr.length;i++) {
+                const url = arr[i];
+                const parts = parseUrlToParts(url);
+                if (!parts) continue;
+                try {
+                    await audioLoader.getAudio(parts.midi, parts.chord);
+                    // remove from failed set
+                    audioLoader.failedUrls.delete(url);
+                } catch(e) {
+                    // keep in failed set
+                }
+                await new Promise(r => setTimeout(r, 300));
+            }
+            localStorage.setItem('chordiceps_failed_urls', JSON.stringify(Array.from(audioLoader.failedUrls || [])));
+            alert('Reintents finalitzats. Errors restants: ' + (audioLoader.failedUrls.size || 0));
+        }
     </script>
 
 
