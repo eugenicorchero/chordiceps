@@ -212,6 +212,46 @@
         // Detectem dispositiu mòbil per ajustar concurrència i mida de cache
         const isMobile = /Mobi|Android|iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.maxTouchPoints && navigator.maxTouchPoints > 0);
 
+    // Create a shared AudioContext early so we can decode audio buffers and play via WebAudio
+    const audioCtx = (window.AudioContext || window.webkitAudioContext) ? new (window.AudioContext || window.webkitAudioContext)() : null;
+
+    // Register a lightweight service worker (in-page blob) to cache audio files and serve them cache-first.
+    (function registerSW(){
+        if (!('serviceWorker' in navigator)) return;
+        try {
+            const swCode = `
+            self.addEventListener('install', e => { self.skipWaiting(); });
+            self.addEventListener('activate', e => { self.clients.claim(); });
+            self.addEventListener('fetch', event => {
+                try {
+                    const url = new URL(event.request.url);
+                    if (url.pathname.includes('/audios/')) {
+                        event.respondWith(caches.open('audio-cache-v1').then(async cache => {
+                            const cached = await cache.match(event.request);
+                            if (cached) {
+                                // update in background
+                                fetch(event.request).then(res => { if (res && res.ok) cache.put(event.request, res.clone()); }).catch(()=>{});
+                                return cached;
+                            }
+                            const res = await fetch(event.request);
+                            if (res && res.ok) cache.put(event.request, res.clone());
+                            return res;
+                        }));
+                    }
+                } catch(e) { /* ignore */ }
+            });
+            `;
+
+            const blob = new Blob([swCode], { type: 'application/javascript' });
+            const swUrl = URL.createObjectURL(blob);
+            navigator.serviceWorker.register(swUrl, { scope: './' }).then(reg => {
+                // console.log('SW registered', reg);
+            }).catch(() => {
+                // ignore failures (e.g., insecure context)
+            });
+        } catch(e) {}
+    })();
+
         // DOM refs
         const screens = {
             difficulty: document.getElementById('difficultyScreen'),
@@ -333,30 +373,42 @@
                     });
 
                     const createAudioElement = () => {
-                        const audio = new Audio();
-                        audio.preload = 'auto';
-                        audio.src = url;
+                                // Fetch the audio as blob - this will populate the SW cache if available
+                                fetch(url).then(resp => {
+                                    if (!resp || !resp.ok) throw new Error('fetch failed');
+                                    return resp.blob();
+                                }).then(blob => {
+                                    const objectUrl = URL.createObjectURL(blob);
+                                    const audio = new Audio();
+                                    audio.preload = 'auto';
+                                    audio.src = objectUrl;
 
-                        const clean = () => {
-                            audio.oncanplaythrough = null;
-                            audio.onerror = null;
-                        };
+                                    const clean = () => {
+                                        audio.oncanplaythrough = null;
+                                        audio.onerror = null;
+                                    };
 
-                        audio.oncanplaythrough = () => {
-                            clean();
-                            this.cache.set(key, audio);
-                            this.promote(key);
-                            this.ensureCacheLimit();
-                            this.loading.delete(key);
-                            resolve({ key, audio, ok: true, url });
-                        };
-                        audio.onerror = () => {
-                            clean();
-                            this.loading.delete(key);
-                            this.failedUrls.add(url);
-                            resolve({ key, audio: null, ok: false, url });
-                        };
-                        try { audio.load(); } catch(e) { setTimeout(() => { this.failedUrls.add(url); resolve({ key, audio: null, ok: false, url }); }, 0); }
+                                    audio.oncanplaythrough = () => {
+                                        clean();
+                                        this.cache.set(key, audio);
+                                        this.promote(key);
+                                        this.ensureCacheLimit();
+                                        this.loading.delete(key);
+                                        resolve({ key, audio, ok: true, url });
+                                    };
+                                    audio.onerror = () => {
+                                        clean();
+                                        this.loading.delete(key);
+                                        this.failedUrls.add(url);
+                                        try { URL.revokeObjectURL(objectUrl); } catch(e) {}
+                                        resolve({ key, audio: null, ok: false, url });
+                                    };
+                                    try { audio.load(); } catch(e) { this.failedUrls.add(url); resolve({ key, audio: null, ok: false, url }); }
+                                }).catch(() => {
+                                    this.loading.delete(key);
+                                    this.failedUrls.add(url);
+                                    resolve({ key, audio: null, ok: false, url });
+                                });
                     };
                 });
 
@@ -433,6 +485,10 @@
                         await runQueue(remainingList, opts.backgroundConcurrency || Math.max(1, Math.floor(this.concurrency / 3)), true);
                         // final update
                         update();
+                        // After background pass, schedule an automatic retry for failed URLs
+                        setTimeout(() => {
+                            try { retryFailedUrls(); } catch(e) {}
+                        }, 8000);
                     })();
                 });
             }
@@ -488,10 +544,9 @@
             }
         }
 
-        // -----------------------
-        // WebAudio fallback synth
-        // -----------------------
-        const audioCtx = (window.AudioContext || window.webkitAudioContext) ? new (window.AudioContext || window.webkitAudioContext)() : null;
+    // -----------------------
+    // WebAudio fallback synth
+    // -----------------------
 
         // Map chord type to semitone intervals (basic approximations)
         const CHORD_INTERVALS = {
