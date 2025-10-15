@@ -258,6 +258,7 @@
                 this.maxCacheSize = options.maxCacheSize || (isMobile ? 64 : 200);
                 this.cache = new Map(); // key -> HTMLAudioElement
                 this.loading = new Map(); // key -> Promise
+                this.failedUrls = new Set();
             }
 
             fileKey(midi, chord) { return `${midi}-${chord}`; }
@@ -302,31 +303,57 @@
                 if (this.loading.has(key)) return this.loading.get(key);
 
                 const url = this.fileUrl(midi, chord);
+                // Try a quick HEAD check (short timeout) to fail fast on 404s/network issues.
                 const p = new Promise((resolve) => {
-                    const audio = new Audio();
-                    audio.preload = 'auto';
-                    audio.src = url;
+                    const controller = new AbortController();
+                    const headTimeout = setTimeout(() => controller.abort(), 2500);
 
-                    const clean = () => {
-                        audio.oncanplaythrough = null;
-                        audio.onerror = null;
-                    };
+                    fetch(url, { method: 'HEAD', signal: controller.signal }).then(resp => {
+                        clearTimeout(headTimeout);
+                        // If server responds OK-ish, proceed to create audio. If server replies 4xx/5xx, fail early.
+                        if (resp && resp.ok) {
+                            createAudioElement();
+                        } else {
+                            // Some servers don't support HEAD (405) - still try audio element unless explicit 4xx/5xx
+                            if (resp && (resp.status >= 400 && resp.status < 600)) {
+                                this.failedUrls.add(url);
+                                resolve({ key, audio: null, ok: false, url });
+                            } else {
+                                createAudioElement();
+                            }
+                        }
+                    }).catch(() => {
+                        clearTimeout(headTimeout);
+                        // HEAD failed (network or CORS), fall back to trying Audio element - it may still load
+                        createAudioElement();
+                    });
 
-                    audio.oncanplaythrough = () => {
-                        clean();
-                        this.cache.set(key, audio);
-                        this.promote(key);
-                        this.ensureCacheLimit();
-                        this.loading.delete(key);
-                        resolve({ key, audio, ok: true, url });
+                    const createAudioElement = () => {
+                        const audio = new Audio();
+                        audio.preload = 'auto';
+                        audio.src = url;
+
+                        const clean = () => {
+                            audio.oncanplaythrough = null;
+                            audio.onerror = null;
+                        };
+
+                        audio.oncanplaythrough = () => {
+                            clean();
+                            this.cache.set(key, audio);
+                            this.promote(key);
+                            this.ensureCacheLimit();
+                            this.loading.delete(key);
+                            resolve({ key, audio, ok: true, url });
+                        };
+                        audio.onerror = () => {
+                            clean();
+                            this.loading.delete(key);
+                            this.failedUrls.add(url);
+                            resolve({ key, audio: null, ok: false, url });
+                        };
+                        try { audio.load(); } catch(e) { setTimeout(() => { this.failedUrls.add(url); resolve({ key, audio: null, ok: false, url }); }, 0); }
                     };
-                    audio.onerror = () => {
-                        clean();
-                        this.loading.delete(key);
-                        resolve({ key, audio: null, ok: false, url });
-                    };
-                    // Try load (some browsers require user interaction to play, but cancanplaythrough still fires on load)
-                    try { audio.load(); } catch(e) { setTimeout(() => resolve({ key, audio: null, ok: false, url }), 0); }
                 });
 
                 this.loading.set(key, p);
@@ -367,12 +394,13 @@
                 const update = () => onProgress({ loaded, totalInitial: initialList.length, totalAll: total, failed });
 
                 // Helper to run limited concurrency on an array
-                const runQueue = (items, concurrency, reportEach = true) => {
+                const runQueue = (items, concurrencyOverride, reportEach = true) => {
                     return new Promise(resolve => {
                         let i = 0; let active = 0;
                         const next = () => {
                             if (i >= items.length && active === 0) return resolve();
-                            while (active < concurrency && i < items.length) {
+                            const concurrencyToUse = concurrencyOverride || this.concurrency;
+                            while (active < concurrencyToUse && i < items.length) {
                                 const it = items[i++]; active++;
                                 this.loadOne(it.midi, it.chord).then(res => {
                                     active--;
@@ -389,7 +417,7 @@
 
                 // 1) Load initialList with moderate concurrency
                 return new Promise(async (resolve) => {
-                    await runQueue(initialList, Math.max(1, Math.floor(this.concurrency / 2)));
+                    await runQueue(initialList, opts.concurrency || Math.max(1, Math.floor(this.concurrency / 2)));
                     // initial stage done
                     update();
                     // Resolve so the app can start quickly
@@ -398,7 +426,7 @@
                     (async () => {
                         // small delay to avoid blocking main thread/network
                         await new Promise(r => setTimeout(r, 300));
-                        await runQueue(remainingList, Math.max(1, Math.floor(this.concurrency / 3)), true);
+                        await runQueue(remainingList, opts.backgroundConcurrency || Math.max(1, Math.floor(this.concurrency / 3)), true);
                         // final update
                         update();
                     })();
@@ -448,8 +476,63 @@
                     if (e.name === 'NotAllowedError') elements.feedbackMessage.textContent = '🔊 Fes clic a Play per permetre àudio.';
                 });
             } catch (e) {
-                elements.feedbackMessage.textContent = '🔊 Àudio no disponible (s’està intentant carregar).';
+                elements.feedbackMessage.textContent = '🔊 Àudio no disponible (s’està intentant carregar). Reproduint fallback sintètic.';
+                // Log failed URL for later inspection
+                try { localStorage.setItem('chordiceps_failed_urls', JSON.stringify(Array.from(audioLoader.failedUrls || []))); } catch(_) {}
+                // Play synthesized fallback so the game remains playable
+                try { playSynthChord(midi, chord); } catch(_) {}
             }
+        }
+
+        // -----------------------
+        // WebAudio fallback synth
+        // -----------------------
+        const audioCtx = (window.AudioContext || window.webkitAudioContext) ? new (window.AudioContext || window.webkitAudioContext)() : null;
+
+        // Map chord type to semitone intervals (basic approximations)
+        const CHORD_INTERVALS = {
+            'Maj': [0, 4, 7],
+            'Men': [0, 3, 7],
+            'Aug': [0, 4, 8],
+            'Dim': [0, 3, 6],
+            'Maj7': [0, 4, 7, 11],
+            'Dom7': [0, 4, 7, 10],
+            'Men7': [0, 3, 7, 10],
+            'm7b5': [0, 3, 6, 10],
+            'Dim7': [0, 3, 6, 9],
+            'AugM7': [0, 4, 8, 11]
+        };
+
+        function midiToFreq(m) {
+            return 440 * Math.pow(2, (m - 69) / 12);
+        }
+
+        function playSynthChord(rootMidi, chordType, duration = 2.0) {
+            if (!audioCtx) return;
+            const now = audioCtx.currentTime;
+            const intervals = CHORD_INTERVALS[chordType] || CHORD_INTERVALS['Maj'];
+            const gainMaster = audioCtx.createGain();
+            gainMaster.gain.setValueAtTime(0.0001, now);
+            gainMaster.connect(audioCtx.destination);
+            // envelope
+            gainMaster.gain.exponentialRampToValueAtTime(0.6, now + 0.02);
+            gainMaster.gain.exponentialRampToValueAtTime(0.001, now + duration);
+
+            intervals.forEach((interval, idx) => {
+                const osc = audioCtx.createOscillator();
+                const detuneOsc = audioCtx.createOscillator();
+                const oscGain = audioCtx.createGain();
+                osc.type = (idx === 0) ? 'sawtooth' : 'sine';
+                const freq = midiToFreq(rootMidi + interval);
+                osc.frequency.setValueAtTime(freq, now);
+                // slight detune for richness
+                osc.detune.setValueAtTime((idx - 1) * 5, now);
+                oscGain.gain.setValueAtTime(1 / (intervals.length), now);
+                osc.connect(oscGain);
+                oscGain.connect(gainMaster);
+                osc.start(now + 0.01);
+                osc.stop(now + duration);
+            });
         }
 
         // -----------------------------------------------
@@ -478,11 +561,13 @@
 
             audioLoader.preloadForDifficulty(difficulty, {
                 initialRoots: (difficulty === 'hard') ? (isMobile ? 6 : 12) : (isMobile ? 4 : 8),
+                concurrency: (difficulty === 'hard') ? (isMobile ? 2 : 6) : undefined,
+                backgroundConcurrency: (difficulty === 'hard') ? (isMobile ? 1 : 3) : undefined,
                 onProgress: ({ loaded, totalInitial, totalAll, failed }) => {
                     // show progress relative to initial stage first, then overall
                     const pct = Math.round((loaded / Math.max(1, totalInitial)) * 100);
                     elements.preloaderBar.style.width = `${Math.min(100, pct)}%`;
-                    elements.preloaderStatus.textContent = `Carregats ${loaded}/${totalInitial} (inicial). Errors: ${failed}`;
+                    elements.preloaderStatus.textContent = `Carregats ${loaded}/${totalInitial} (inicial). Errors: ${failed} (fails: ${audioLoader.failedUrls.size})`;
                 }
             }).then(({ failed, failedUrls } = {}) => {
                 gameState.isAudioReady = true;
@@ -492,7 +577,7 @@
             }).catch(e => {
                 gameState.isAudioReady = false;
                 elements.loadingOverlay.classList.add('hidden');
-                showAudioErrorPopup('No s\'han pogut carregar alguns àudios. El joc intentarà carregar sota demanda.');
+                showAudioErrorPopup('No s\'han pogut carregar alguns àudios. El joc intentarà carregar sota demanda. Errors totals: ' + audioLoader.failedUrls.size);
                 showScreen('quiz');
                 loadNextRound();
             });
