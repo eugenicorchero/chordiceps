@@ -477,7 +477,7 @@
             elements.preloaderStatus.textContent = 'Preparant àudios...';
 
             audioLoader.preloadForDifficulty(difficulty, {
-                initialRoots: isMobile ? 4 : 8,
+                initialRoots: (difficulty === 'hard') ? (isMobile ? 6 : 12) : (isMobile ? 4 : 8),
                 onProgress: ({ loaded, totalInitial, totalAll, failed }) => {
                     // show progress relative to initial stage first, then overall
                     const pct = Math.round((loaded / Math.max(1, totalInitial)) * 100);
@@ -498,28 +498,15 @@
             });
         }
 
+        // Generate a random chord (no blocking cache checks here)
         function generateChord() {
             const availableChords = DIFFICULTY_CONFIG[gameState.difficulty].chords;
-            let chordType = availableChords[Math.floor(Math.random() * availableChords.length)];
-
-            let attempts = 0; const MAX_ATTEMPTS = 80;
-            let rootMIDI, fileKey;
-            do {
-                rootMIDI = Math.floor(Math.random() * (MIDI_END - MIDI_START + 1)) + MIDI_START;
-                fileKey = `${rootMIDI}-${chordType}`;
-                attempts++;
-                if (attempts > MAX_ATTEMPTS/2) chordType = DIFFICULTY_CONFIG.easy.chords[Math.floor(Math.random()*DIFFICULTY_CONFIG.easy.chords.length)];
-            } while (!audioLoader.isLoadedKey(fileKey) && attempts < MAX_ATTEMPTS);
-
-            if (attempts >= MAX_ATTEMPTS) {
-                // fallback
-                return { correctChordType: 'Maj', baseNoteMIDI: MIDI_START, label: CHORD_ABBREVIATIONS['Maj'] };
-            }
-
+            const chordType = availableChords[Math.floor(Math.random() * availableChords.length)];
+            const rootMIDI = Math.floor(Math.random() * (MIDI_END - MIDI_START + 1)) + MIDI_START;
             return { correctChordType: chordType, baseNoteMIDI: rootMIDI, label: CHORD_ABBREVIATIONS[chordType] };
         }
 
-        function loadNextRound() {
+        async function loadNextRound() {
             gameState.round++; gameState.isAnswered = false;
             elements.feedbackMessage.textContent = '';
             elements.feedbackMessage.className = 'mt-6 text-center text-lg font-bold min-h-6';
@@ -539,6 +526,24 @@
             const optionsToUse = DIFFICULTY_CONFIG[gameState.difficulty].chords;
             generateOptions(optionsToUse);
             startTimer();
+
+            // Intentem carregar sota demanda si no existeix encara
+            const midi = gameState.baseNoteMIDI;
+            const chord = gameState.correctChordType;
+            const key = `${midi}-${chord}`;
+            if (!audioLoader.isLoadedKey(key)) {
+                elements.feedbackMessage.textContent = '🔄 Carregant àudio...';
+                try {
+                    // intent amb timeout (5s) i 1 retry
+                    await Promise.race([
+                        audioLoader.getAudio(midi, chord),
+                        new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 5000))
+                    ]);
+                } catch (e) {
+                    // retry once quickly
+                    try { await audioLoader.getAudio(midi, chord); } catch (e2) { elements.feedbackMessage.textContent = '⚠️ Àudio no disponible per a aquesta ronda.'; }
+                }
+            }
 
             if (gameState.isAudioReady) playChord();
         }
