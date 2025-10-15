@@ -185,78 +185,30 @@
         // VARIABLES GLOBALS I CONFIGURACIÓ (ADAPTAT PER ACORDS)
         // ===============================================
 
-        // RUTA DE L'ÀUDIO: ACTUALITZADA A LA CARPETA 'audios' (PLURAL)
-        const AUDIO_PATH = './audios/'; 
-        
-        // RANG DE NOTES DEL TEU ACORD (C3 a B3, inclosos)
-        const MIDI_START = 48; // C3 (Nota més baixa)
-        const MIDI_END = 59;   // B3 (Nota més alta)
-        const TOTAL_MIDI_ROOTS = MIDI_END - MIDI_START + 1; // 12 fonamentals possibles
+        const AUDIO_PATH = './audios/';
+        const MIDI_START = 48; // C3
+        const MIDI_END = 59;   // B3
+        const TOTAL_MIDI_ROOTS = MIDI_END - MIDI_START + 1;
+        const TIMER_DURATION = 30;
 
-        const TIMER_DURATION = 30; // Temps en segons
-
-        // CACHE: Emmagatzemarà tots els objectes Audio ja carregats
-        const audioCache = {};
-        
-        // ABREVIATURES D'ACORD (Clau: Nom del fitxer MP3; Valor: Text del botó)
+        // ABREVIATURES D'ACORD
         const CHORD_ABBREVIATIONS = {
-            'Maj': 'Maj',           
-            'Men': 'Men',           
-            'Aug': 'Aug',           
-            'Dim': 'Dism',          
-            'Maj7': 'Maj 7',        
-            'Dom7': 'Dom 7',        
-            'Men7': 'Men 7',
-            'm7b5': 'm7b5',       
-            'Dim7': 'Dism 7',       
-            'AugM7': 'Aug M7'       
+            'Maj': 'Maj', 'Men': 'Men', 'Aug': 'Aug', 'Dim': 'Dism',
+            'Maj7': 'Maj 7', 'Dom7': 'Dom 7', 'Men7': 'Men 7', 'm7b5': 'm7b5', 'Dim7': 'Dism 7', 'AugM7': 'Aug M7'
         };
+        const ALL_CHORDS = Object.keys(CHORD_ABBREVIATIONS);
+        const CHORD_DISPLAY_ORDER = ['Maj','Men','Aug','Dim','AugM7','Maj7','Men7','Dom7','m7b5','Dim7'];
 
-        const ALL_CHORDS = Object.keys(CHORD_ABBREVIATIONS); 
-        
-        // NOU ARRAY: ORDRE DE VISUALITZACIÓ DELS BOTONS
-        const CHORD_DISPLAY_ORDER = [
-            'Maj',    
-            'Men',    
-            'Aug',    
-            'Dim',    
-            'AugM7',  
-            'Maj7',   
-            'Men7',   
-            'Dom7',   
-            'm7b5',   
-            'Dim7',   
-        ];
-        
-        
-        // CONFIGURACIÓ DELS NIVELLS DE DIFICULTAT
         const DIFFICULTY_CONFIG = {
-            easy: {
-                chords: ['Maj', 'Men'], 
-            },
-            medium: {
-                chords: ['Maj', 'Men', 'Aug', 'Dim'], 
-            },
-            hard: {
-                chords: ALL_CHORDS, // Ara inclou els 10 acords
-            }
-        };
-        
-        // Estats del joc
-        let gameState = {
-            difficulty: null,
-            score: 0,
-            round: 0,
-            correctChordType: null, 
-            timer: null,
-            timeRemaining: TIMER_DURATION,
-            isAnswered: false,
-            baseNoteMIDI: null, 
-            currentChordLabel: null, 
-            isAudioReady: false, 
+            easy: { chords: ['Maj','Men'] },
+            medium: { chords: ['Maj','Men','Aug','Dim'] },
+            hard: { chords: ALL_CHORDS }
         };
 
-        // Referències al DOM
+        // Detectem dispositiu mòbil per ajustar concurrència i mida de cache
+        const isMobile = /Mobi|Android|iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.maxTouchPoints && navigator.maxTouchPoints > 0);
+
+        // DOM refs
         const screens = {
             difficulty: document.getElementById('difficultyScreen'),
             quiz: document.getElementById('quizScreen'),
@@ -279,505 +231,382 @@
             preloaderBar: document.getElementById('preloaderBar'),
             preloaderStatus: document.getElementById('preloaderStatus'),
             debugNotes: document.getElementById('debugNotes'),
-            // [NOU] Referència al llistat d'acords de dificultat "Difícil"
-            hardChordsList: document.getElementById('hardChordsList'), 
+            hardChordsList: document.getElementById('hardChordsList')
         };
 
+        // Estat del joc
+        let gameState = {
+            difficulty: null,
+            score: 0,
+            round: 0,
+            correctChordType: null,
+            timer: null,
+            timeRemaining: TIMER_DURATION,
+            isAnswered: false,
+            baseNoteMIDI: null,
+            currentChordLabel: null,
+            isAudioReady: false
+        };
 
-        // ===============================================
-        // UTILS D'ÀUDIO I MIDI
-        // ===============================================
-        
-        /**
-         * Converteix un número MIDI a nom de FONAMENTAL per a la VISUALITZACIÓ (utilitza #).
-         */
-        function getRootName(midiNumber) {
-            const notesMap = [
-                'C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'
-            ];
-            const octave = Math.floor(midiNumber / 12) - 1;
-            const noteIndex = midiNumber % 12;
-            const finalNoteName = notesMap[noteIndex];
-            
-            return `${finalNoteName}${octave}`;
-        }
-        
-        /**
-         * Genera el nom de la FONAMENTAL utilitzant 's' en lloc de '#' (per als FITXERS).
-         */
-        function getFileRootName(midiNumber) {
-            // Aquest map utilitza 's' per coincidir amb la nomenclatura dels vostres arxius.
-            const fileNotesMap = [
-                'C', 'Cs', 'D', 'Ds', 'E', 'F', 'Fs', 'G', 'Gs', 'A', 'As', 'B'
-            ];
-            const octave = Math.floor(midiNumber / 12) - 1;
-            const noteIndex = midiNumber % 12;
-            const finalFileNoteName = fileNotesMap[noteIndex];
-            
-            return `${finalFileNoteName}${octave}`;
-        }
+        // -----------------------------------------------
+        // AudioLoader: LRU cache + staged preload + on-demand
+        // -----------------------------------------------
+        class AudioLoader {
+            constructor(options = {}) {
+                this.audioPath = options.audioPath || AUDIO_PATH;
+                this.concurrency = options.concurrency || (isMobile ? 3 : 8);
+                this.maxCacheSize = options.maxCacheSize || (isMobile ? 64 : 200);
+                this.cache = new Map(); // key -> HTMLAudioElement
+                this.loading = new Map(); // key -> Promise
+            }
 
-        /**
-         * Genera la URL completa del fitxer d'àudio.
-         */
-        function getFileName(midiNumber, chordType) {
-            const rootName = getFileRootName(midiNumber); 
-            
-            // La part de l'acord (ex: Maj, m7b5) ha de coincidir exactament amb la clau.
-            const rawFileName = `${rootName}-${chordType}.mp3`;
-            
-            return `${AUDIO_PATH}${rawFileName}`;
-        }
-        
-        /**
-         * Precàrrega (Pre-load) de tots els fitxers d'àudio segons la configuració total.
-         */
-        function preloadAllAudio() {
-            return new Promise((resolve, reject) => {
-                const totalChords = ALL_CHORDS.length; 
-                const totalFilesToLoad = TOTAL_MIDI_ROOTS * totalChords; 
-                
-                let filesLoaded = 0;
-                let errors = 0;
-                let failedUrls = [];
+            fileKey(midi, chord) { return `${midi}-${chord}`; }
 
-                const onLoaded = (isError, fileURL) => { 
-                    filesLoaded++;
-                    if (isError) {
-                        errors++;
-                        console.warn(`Fallada en carregar: ${fileURL}`);
-                    }
-                    
-                    const percentage = Math.round((filesLoaded / totalFilesToLoad) * 100);
-                    elements.preloaderBar.style.width = `${percentage}%`;
-                    elements.preloaderStatus.textContent = `Carregats ${filesLoaded}/${totalFilesToLoad} acords. ${errors > 0 ? '(' + errors + ' errors)' : ''}`;
+            fileUrl(midi, chord) {
+                const fileNotesMap = ['C','Cs','D','Ds','E','F','Fs','G','Gs','A','As','B'];
+                const octave = Math.floor(midi / 12) - 1;
+                const noteIndex = midi % 12;
+                const root = fileNotesMap[noteIndex] + octave;
+                return `${this.audioPath}${root}-${chord}.mp3`;
+            }
 
-                    if (filesLoaded === totalFilesToLoad) {
-                        if (errors === 0) {
-                            console.log("Precàrrega OK: Tots els fitxers d'acord s'han trobat.");
-                            resolve();
-                        } else {
-                            console.warn(`Precàrrega finalitzada amb ${errors} fitxers fallits.`);
-                            
-                            reject({
-                                errorCount: errors,
-                                failedUrls: failedUrls
-                            });
-                        }
-                    }
+            // Promou una clau com a recent (LRU)
+            promote(key) {
+                if (!this.cache.has(key)) return;
+                const v = this.cache.get(key);
+                this.cache.delete(key);
+                this.cache.set(key, v);
+            }
+
+            // Evict si cal
+            ensureCacheLimit() {
+                while (this.cache.size > this.maxCacheSize) {
+                    const oldestKey = this.cache.keys().next().value;
+                    const audio = this.cache.get(oldestKey);
+                    try { if (audio && audio.src && audio.src.startsWith('blob:')) URL.revokeObjectURL(audio.src); } catch(e) {}
+                    this.cache.delete(oldestKey);
+                }
+            }
+
+            isLoadedKey(key) { return this.cache.has(key); }
+
+            getIfLoaded(key) { return this.cache.get(key); }
+
+            // Carrega un fitxer i retorna Promise que resol amb l'element Audio
+            loadOne(midi, chord) {
+                const key = this.fileKey(midi, chord);
+                if (this.cache.has(key)) {
+                    this.promote(key);
+                    return Promise.resolve(this.cache.get(key));
+                }
+                if (this.loading.has(key)) return this.loading.get(key);
+
+                const url = this.fileUrl(midi, chord);
+                const p = new Promise((resolve) => {
+                    const audio = new Audio();
+                    audio.preload = 'auto';
+                    audio.src = url;
+
+                    const clean = () => {
+                        audio.oncanplaythrough = null;
+                        audio.onerror = null;
+                    };
+
+                    audio.oncanplaythrough = () => {
+                        clean();
+                        this.cache.set(key, audio);
+                        this.promote(key);
+                        this.ensureCacheLimit();
+                        this.loading.delete(key);
+                        resolve({ key, audio, ok: true, url });
+                    };
+                    audio.onerror = () => {
+                        clean();
+                        this.loading.delete(key);
+                        resolve({ key, audio: null, ok: false, url });
+                    };
+                    // Try load (some browsers require user interaction to play, but cancanplaythrough still fires on load)
+                    try { audio.load(); } catch(e) { setTimeout(() => resolve({ key, audio: null, ok: false, url }), 0); }
+                });
+
+                this.loading.set(key, p);
+                return p;
+            }
+
+            // Precarrega suggerida per al nivell de dificultat.
+            // Strategy: carregar ràpidament una petita llista de fonamentals (initialRoots) per a un arranc ràpid,
+            // després continuar en background amb la resta. Retorna Promise que resol quan l'etapa inicial està carregada.
+            preloadForDifficulty(difficulty, opts = {}) {
+                const chords = (DIFFICULTY_CONFIG[difficulty] || DIFFICULTY_CONFIG.easy).chords;
+                const onProgress = opts.onProgress || function () {};
+                const total = chords.length * TOTAL_MIDI_ROOTS;
+
+                // Determine staged loading size
+                const initialRoots = opts.initialRoots || (isMobile ? 4 : 8);
+
+                // Build list of all items
+                const allRoots = [];
+                for (let m = MIDI_START; m <= MIDI_END; m++) allRoots.push(m);
+
+                // Initial roots: take spread across the set for variety
+                const step = Math.max(1, Math.floor(allRoots.length / initialRoots));
+                const initialRootSet = allRoots.filter((_, idx) => idx % step === 0).slice(0, initialRoots);
+
+                const initialList = [];
+                const remainingList = [];
+
+                allRoots.forEach(midi => {
+                    chords.forEach(chord => {
+                        const item = { midi, chord };
+                        if (initialRootSet.includes(midi)) initialList.push(item); else remainingList.push(item);
+                    });
+                });
+
+                let loaded = 0; let failed = 0; const failedUrls = [];
+
+                const update = () => onProgress({ loaded, totalInitial: initialList.length, totalAll: total, failed });
+
+                // Helper to run limited concurrency on an array
+                const runQueue = (items, concurrency, reportEach = true) => {
+                    return new Promise(resolve => {
+                        let i = 0; let active = 0;
+                        const next = () => {
+                            if (i >= items.length && active === 0) return resolve();
+                            while (active < concurrency && i < items.length) {
+                                const it = items[i++]; active++;
+                                this.loadOne(it.midi, it.chord).then(res => {
+                                    active--;
+                                    if (!res.ok) { failed++; failedUrls.push(res.url); }
+                                    loaded++;
+                                    if (reportEach) update();
+                                    setTimeout(next, 0);
+                                });
+                            }
+                        };
+                        next();
+                    });
                 };
 
-                // Bucle per a TOTES les combinacions possibles (12 Fonamentals x 10 Acords)
-                for (let midi = MIDI_START; midi <= MIDI_END; midi++) {
-                    ALL_CHORDS.forEach(chordType => {
-                        const fileKey = `${midi}-${chordType}`; 
-                        const fileURL = getFileName(midi, chordType); 
-
-                        const audio = new Audio(fileURL);
-                        audioCache[fileKey] = audio; 
-
-                        audio.oncanplaythrough = () => onLoaded(false, fileURL);
-                        audio.onerror = (e) => {
-                            setTimeout(() => {
-                                failedUrls.push(fileURL); 
-                                onLoaded(true, fileURL); 
-                            }, 50); 
-                        };
-                        audio.load();
-                    });
-                }
-            });
-        }
-        
-        /**
-         * (Comprova i inicia la precàrrega)
-         */
-        function checkAudioAccessibility() {
-            preloadAllAudio()
-                .then(() => {
-                    gameState.isAudioReady = true;
-                    hideAudioErrorPopup();
-                    elements.loadingOverlay.classList.add('hidden');
-                    screens.difficulty.classList.remove('opacity-0');
-                    initializeHardChordsList(); // [NOU] Inicialització de la llista d'acords
-                })
-                .catch((error) => {
-                    gameState.isAudioReady = false;
-                    
-                    let message = `No s'han pogut carregar ${error.errorCount} arxius d'acord.`;
-                    
-                    if (error.failedUrls.length > 0) {
-                        const failedUrl = error.failedUrls[0];
-                        message += ` Primer URL buscat: ${failedUrl}`;
-                    }
-                    
-                    showAudioErrorPopup(message);
-                    elements.loadingOverlay.classList.add('hidden');
-                    screens.difficulty.classList.remove('opacity-0');
-                    initializeHardChordsList(); // [NOU] També l'inicialitzem en cas d'error.
+                // 1) Load initialList with moderate concurrency
+                return new Promise(async (resolve) => {
+                    await runQueue(initialList, Math.max(1, Math.floor(this.concurrency / 2)));
+                    // initial stage done
+                    update();
+                    // Resolve so the app can start quickly
+                    resolve({ initialLoaded: true, failed, failedUrls });
+                    // 2) background load remaining (low concurrency, spaced)
+                    (async () => {
+                        // small delay to avoid blocking main thread/network
+                        await new Promise(r => setTimeout(r, 300));
+                        await runQueue(remainingList, Math.max(1, Math.floor(this.concurrency / 3)), true);
+                        // final update
+                        update();
+                    })();
                 });
-        }
-
-        function showAudioErrorPopup(message) {
-            const popup = elements.audioErrorPopup;
-            elements.audioErrorMessage.textContent = message;
-            popup.classList.remove('hidden');
-            setTimeout(hideAudioErrorPopup, 15000); 
-        }
-
-        function hideAudioErrorPopup() {
-            elements.audioErrorPopup.classList.add('hidden');
-        }
-
-        /**
-         * Reprodueix l'acord generat.
-         */
-        function playChord() {
-            const fileKey = `${gameState.baseNoteMIDI}-${gameState.correctChordType}`;
-            const audio = audioCache[fileKey];
-
-            if (!audio || !gameState.isAudioReady) {
-                 elements.feedbackMessage.textContent = '🔊 Error: L\'àudio no està preparat. Revisa els fitxers.';
-                 elements.feedbackMessage.classList.remove('text-green-400', 'text-red-400');
-                 elements.feedbackMessage.classList.add('text-yellow-400');
-                 return;
             }
 
-            const resetAndPlay = (audio) => {
-                 audio.pause();
-                 audio.currentTime = 0; 
-                 audio.play().catch(e => {
-                    if (e.name === "NotAllowedError" || e.name === "AbortError") {
-                        elements.feedbackMessage.textContent = '🔊 Permet la reproducció automàtica o fes clic a Play.';
-                        elements.feedbackMessage.classList.add('text-yellow-400');
-                    }
-                 });
-            };
+            // On-demand get: returns a Promise that resolves to audio element (loads if needed)
+            getAudio(midi, chord) {
+                const key = this.fileKey(midi, chord);
+                if (this.cache.has(key)) {
+                    this.promote(key);
+                    return Promise.resolve(this.cache.get(key));
+                }
+                return this.loadOne(midi, chord).then(res => res.ok ? res.audio : Promise.reject(new Error('load failed')));
+            }
+        }
+
+        // Instància global
+        const audioLoader = new AudioLoader({ audioPath: AUDIO_PATH, concurrency: isMobile ? 3 : 8, maxCacheSize: isMobile ? 80 : 300 });
+
+        // -----------------------------------------------
+        // Utils d'àudio i integració amb la UI
+        // -----------------------------------------------
+        function showAudioErrorPopup(message) {
+            elements.audioErrorMessage.textContent = message;
+            elements.audioErrorPopup.classList.remove('hidden');
+            setTimeout(() => elements.audioErrorPopup.classList.add('hidden'), 15000);
+        }
+
+        function getRootName(midiNumber) {
+            const notesMap = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+            const octave = Math.floor(midiNumber / 12) - 1;
+            return `${notesMap[midiNumber % 12]}${octave}`;
+        }
+
+        // Reproduir acord (assegura cargar si cal)
+        async function playChord() {
+            const midi = gameState.baseNoteMIDI;
+            const chord = gameState.correctChordType;
+            if (!midi || !chord) return;
 
             try {
-                resetAndPlay(audio);
-            } catch(e) {
-                 console.error("Error crític de reproducció:", e);
-                 elements.feedbackMessage.textContent = 'Error de reproducció inesperat.';
-                 elements.feedbackMessage.classList.remove('text-green-400', 'text-yellow-400');
-                 elements.feedbackMessage.classList.add('text-red-400');
+                const audio = await audioLoader.getAudio(midi, chord);
+                audio.pause(); audio.currentTime = 0;
+                const p = audio.play();
+                if (p && p.catch) p.catch(e => {
+                    if (e.name === 'NotAllowedError') elements.feedbackMessage.textContent = '🔊 Fes clic a Play per permetre àudio.';
+                });
+            } catch (e) {
+                elements.feedbackMessage.textContent = '🔊 Àudio no disponible (s’està intentant carregar).';
             }
         }
 
-
-        // ===============================================
-        // LÒGICA DEL JOC 
-        // ===============================================
-        
-        /**
-         * [NOVA FUNCIÓ] Genera la llista d'acords per a la descripció del nivell Difícil.
-         */
+        // -----------------------------------------------
+        // Lògica del joc (lleugeres adaptacions per usar audioLoader)
+        // -----------------------------------------------
         function initializeHardChordsList() {
-            const hardChordsKeys = DIFFICULTY_CONFIG.hard.chords;
-            
-            // Map the file keys to the display labels and join them
-            const chordLabels = hardChordsKeys.map(key => CHORD_ABBREVIATIONS[key]);
-            
-            // Format: Maj, Men, Aug, Dism, Maj 7, Dom 7, Men 7, m7b5, Dism 7, Aug M7
-            const listText = chordLabels.join(', ');
-            
-            elements.hardChordsList.textContent = `Acords: ${listText}`;
+            const chordLabels = DIFFICULTY_CONFIG.hard.chords.map(k => CHORD_ABBREVIATIONS[k]);
+            elements.hardChordsList.textContent = `Acords: ${chordLabels.join(', ')}`;
         }
 
-
         function showScreen(screenId) {
-            Object.values(screens).forEach(screen => screen.classList.add('hidden'));
+            Object.values(screens).forEach(s => s.classList.add('hidden'));
             screens[screenId].classList.remove('hidden');
         }
 
+        // Quan l'usuari tria dificultat: preparem la preload escalonada i mostrem la pantalla de quiz quan l'etapa inicial estigui llesta
         function startGame(difficulty) {
-            if (!DIFFICULTY_CONFIG[difficulty]) {
-                console.error("Dificultat no reconeguda:", difficulty);
-                return;
-            }
+            if (!DIFFICULTY_CONFIG[difficulty]) return console.error('Dificultat no reconeguda', difficulty);
             gameState.difficulty = difficulty;
-            gameState.score = 0;
-            gameState.round = 0;
-            elements.score.textContent = gameState.score;
-            
-            showScreen('quiz');
-            loadNextRound();
+            gameState.score = 0; gameState.round = 0; elements.score.textContent = '0';
+
+            // Mostrem overlay i iniciem preload suggerida
+            elements.loadingOverlay.classList.remove('hidden');
+            elements.preloaderBar.style.width = '0%';
+            elements.preloaderStatus.textContent = 'Preparant àudios...';
+
+            audioLoader.preloadForDifficulty(difficulty, {
+                initialRoots: isMobile ? 4 : 8,
+                onProgress: ({ loaded, totalInitial, totalAll, failed }) => {
+                    // show progress relative to initial stage first, then overall
+                    const pct = Math.round((loaded / Math.max(1, totalInitial)) * 100);
+                    elements.preloaderBar.style.width = `${Math.min(100, pct)}%`;
+                    elements.preloaderStatus.textContent = `Carregats ${loaded}/${totalInitial} (inicial). Errors: ${failed}`;
+                }
+            }).then(({ failed, failedUrls } = {}) => {
+                gameState.isAudioReady = true;
+                elements.loadingOverlay.classList.add('hidden');
+                showScreen('quiz');
+                loadNextRound();
+            }).catch(e => {
+                gameState.isAudioReady = false;
+                elements.loadingOverlay.classList.add('hidden');
+                showAudioErrorPopup('No s\'han pogut carregar alguns àudios. El joc intentarà carregar sota demanda.');
+                showScreen('quiz');
+                loadNextRound();
+            });
         }
 
-        /**
-         * Genera un acord aleatori amb la fonamental (MIDI) i el tipus.
-         */
         function generateChord() {
-            const config = DIFFICULTY_CONFIG[gameState.difficulty];
-            const availableChords = config.chords;
-
-            // 1. Selecciona un tipus d'acord aleatori
+            const availableChords = DIFFICULTY_CONFIG[gameState.difficulty].chords;
             let chordType = availableChords[Math.floor(Math.random() * availableChords.length)];
-            
-            // 2. Selecciona una fonamental MIDI aleatòria (de C3 a B3)
-            let rootMIDI;
-            let fileKey;
-            let attempts = 0;
-            const MAX_ATTEMPTS = 50;
 
-            // Bucle per assegurar-nos que l'acord aleatori escollit realment s'ha carregat a la memòria
+            let attempts = 0; const MAX_ATTEMPTS = 80;
+            let rootMIDI, fileKey;
             do {
                 rootMIDI = Math.floor(Math.random() * (MIDI_END - MIDI_START + 1)) + MIDI_START;
-                
-                // Si l'acord escollit falla, intentem amb un tipus de menys dificultat (Maj/Men)
-                if (attempts > MAX_ATTEMPTS / 2) {
-                    const fallbackChords = DIFFICULTY_CONFIG.easy.chords;
-                    chordType = fallbackChords[Math.floor(Math.random() * fallbackChords.length)];
-                }
-
                 fileKey = `${rootMIDI}-${chordType}`;
                 attempts++;
-            } while (!audioCache[fileKey] && attempts < MAX_ATTEMPTS); 
+                if (attempts > MAX_ATTEMPTS/2) chordType = DIFFICULTY_CONFIG.easy.chords[Math.floor(Math.random()*DIFFICULTY_CONFIG.easy.chords.length)];
+            } while (!audioLoader.isLoadedKey(fileKey) && attempts < MAX_ATTEMPTS);
 
             if (attempts >= MAX_ATTEMPTS) {
-                console.error("No s'ha pogut trobar un arxiu d'acord vàlid al cache després de molts intents. Revisar el cache d'àudio.");
-                // Fallback a un acord conegut si la precàrrega va fallar en tots
-                return { correctChordType: 'Maj', baseNoteMIDI: 48, label: 'Maj' }; 
+                // fallback
+                return { correctChordType: 'Maj', baseNoteMIDI: MIDI_START, label: CHORD_ABBREVIATIONS['Maj'] };
             }
-            
-            // Utilitzem l'abreviatura per al feedback/etiqueta
-            const chordLabel = CHORD_ABBREVIATIONS[chordType];
 
-            return {
-                correctChordType: chordType, 
-                baseNoteMIDI: rootMIDI, 
-                label: `${chordLabel}`
-            };
+            return { correctChordType: chordType, baseNoteMIDI: rootMIDI, label: CHORD_ABBREVIATIONS[chordType] };
         }
 
-        /**
-         * Inicialitza una nova ronda de joc.
-         */
         function loadNextRound() {
-            gameState.round++;
-            gameState.isAnswered = false;
-            
-            // Neteja l'estat anterior
+            gameState.round++; gameState.isAnswered = false;
             elements.feedbackMessage.textContent = '';
-            elements.feedbackMessage.className = 'mt-6 text-center text-lg font-bold min-h-6'; 
+            elements.feedbackMessage.className = 'mt-6 text-center text-lg font-bold min-h-6';
             elements.nextRoundButton.classList.add('hidden');
             elements.roundCount.textContent = gameState.round;
-            
-            // 1. Genera un nou acord
+
             const newChord = generateChord();
             gameState.correctChordType = newChord.correctChordType;
             gameState.baseNoteMIDI = newChord.baseNoteMIDI;
-            gameState.currentChordLabel = newChord.label; 
+            gameState.currentChordLabel = newChord.label;
 
             elements.playButton.disabled = !gameState.isAudioReady;
             elements.playButton.classList.remove('opacity-50');
-            
-            // Mostrar la fonamental amb '#' (Per a la visualització, ja que és l'estàndard musical)
+
             elements.directionLabel.textContent = `Reconeix l'Acord (Fonamental: ${getRootName(gameState.baseNoteMIDI)})`;
-            
-            // 2. Genera els botons d'opció UTILITZANT NOMÉS ELS TIPUS D'ACORD D'AQUEST NIVELL
+
             const optionsToUse = DIFFICULTY_CONFIG[gameState.difficulty].chords;
             generateOptions(optionsToUse);
-
-            // 3. Inicialitza el temporitzador
             startTimer();
-            
-            // 4. Reprodueix l'acord automàticament 
-            if (gameState.isAudioReady) {
-                 playChord();
-            } else {
-                 elements.feedbackMessage.textContent = 'Àudio no disponible. Prova de depurar la precàrrega.';
-                 elements.feedbackMessage.classList.remove('text-green-400');
-                 elements.feedbackMessage.classList.add('text-red-400');
-            }
+
+            if (gameState.isAudioReady) playChord();
         }
 
-        /**
-         * Genera els botons d'opció de resposta.
-         * @param {string[]} availableOptions - Array de claus d'acords (ex: ['Maj', 'Men']).
-         */
         function generateOptions(availableOptions) {
-            elements.intervalOptions.innerHTML = ''; 
-            
-            // 1. Filtrem l'ordre de visualització global (CHORD_DISPLAY_ORDER)
-            const orderedOptions = CHORD_DISPLAY_ORDER.filter(key => availableOptions.includes(key));
-
-            // 2. Mapegem les claus a les dades per als botons
-            const buttonsData = orderedOptions.map(key => ({
-                key: key, 
-                label: CHORD_ABBREVIATIONS[key] 
-            }));
-            
-            // 3. Creem els botons en l'ordre establert
+            elements.intervalOptions.innerHTML = '';
+            const orderedOptions = CHORD_DISPLAY_ORDER.filter(k => availableOptions.includes(k));
+            const buttonsData = orderedOptions.map(key => ({ key, label: CHORD_ABBREVIATIONS[key] }));
             buttonsData.forEach(chord => {
                 const button = document.createElement('button');
                 button.textContent = chord.label;
                 button.setAttribute('data-chord-type', chord.key);
                 button.onclick = () => checkAnswer(chord.key, button);
-                // Classes per a estils consistents i responsive
-                button.classList.add('py-3', 'px-4', 'bg-gray-700', 'text-gray-100', 'font-semibold', 'rounded-lg', 'shadow-sm', 'hover:bg-blue-600', 'hover:text-white', 'transition', 'duration-150', 'text-sm', 'md:text-base');
+                button.classList.add('py-3','px-4','bg-gray-700','text-gray-100','font-semibold','rounded-lg','shadow-sm','hover:bg-blue-600','hover:text-white','transition','duration-150','text-sm','md:text-base');
                 elements.intervalOptions.appendChild(button);
             });
-            
             const numOptions = availableOptions.length;
             let gridLayout = 'repeat(auto-fit, minmax(120px, 1fr))';
-            
-            if (numOptions > 8) { // Més opcions, fem la mida mínima una mica més petita
-                gridLayout = 'repeat(auto-fit, minmax(100px, 1fr))'; 
-            } else if (numOptions > 4) {
-                gridLayout = 'repeat(auto-fit, minmax(120px, 1fr))';
-            }
+            if (numOptions > 8) gridLayout = 'repeat(auto-fit, minmax(100px, 1fr))';
             elements.intervalOptions.style.gridTemplateColumns = gridLayout;
         }
 
-        /**
-         * Comprova si la resposta de l'usuari és correcta.
-         */
         function checkAnswer(selectedChordType, selectedButton) {
-            if (gameState.isAnswered) return; 
-
-            clearInterval(gameState.timer); 
-            gameState.isAnswered = true;
-
+            if (gameState.isAnswered) return;
+            clearInterval(gameState.timer); gameState.isAnswered = true;
             const isCorrect = selectedChordType === gameState.correctChordType;
-
             Array.from(elements.intervalOptions.children).forEach(btn => {
-                btn.disabled = true;
-                btn.classList.remove('hover:bg-blue-600', 'bg-gray-700'); 
-                btn.classList.add('cursor-not-allowed', 'opacity-80');
-
+                btn.disabled = true; btn.classList.remove('hover:bg-blue-600','bg-gray-700'); btn.classList.add('cursor-not-allowed','opacity-80');
                 const currentChordType = btn.getAttribute('data-chord-type');
-
-                if (currentChordType === gameState.correctChordType) {
-                    btn.classList.add('bg-green-500', 'text-white', 'font-bold');
-                } else if (btn === selectedButton) {
-                    btn.classList.add('bg-red-500', 'text-white', 'font-bold');
-                }
+                if (currentChordType === gameState.correctChordType) btn.classList.add('bg-green-500','text-white','font-bold');
+                else if (btn === selectedButton) btn.classList.add('bg-red-500','text-white','font-bold');
             });
-
-            if (isCorrect) {
-                gameState.score++;
-                elements.score.textContent = gameState.score;
-                elements.feedbackMessage.textContent = '✅ Correcte! Acord: ' + gameState.currentChordLabel;
-                elements.feedbackMessage.classList.remove('text-red-400', 'text-yellow-400');
-                elements.feedbackMessage.classList.add('text-green-400'); 
-            } else {
-                elements.feedbackMessage.textContent = '❌ Incorrecte. La resposta era: ' + gameState.currentChordLabel;
-                elements.feedbackMessage.classList.remove('text-green-400', 'text-yellow-400');
-                elements.feedbackMessage.classList.add('text-red-400'); 
-            }
-
+            if (isCorrect) { gameState.score++; elements.score.textContent = gameState.score; elements.feedbackMessage.textContent = '✅ Correcte! Acord: ' + gameState.currentChordLabel; elements.feedbackMessage.classList.add('text-green-400'); }
+            else { elements.feedbackMessage.textContent = '❌ Incorrecte. La resposta era: ' + gameState.currentChordLabel; elements.feedbackMessage.classList.add('text-red-400'); }
             elements.nextRoundButton.classList.remove('hidden');
         }
 
-        /**
-         * Inicialitza el compte enrere de 30 segons.
-         */
         function startTimer() {
-            gameState.timeRemaining = TIMER_DURATION;
-            elements.timeRemaining.textContent = TIMER_DURATION;
-            elements.progressBar.style.width = '100%';
-            
+            gameState.timeRemaining = TIMER_DURATION; elements.timeRemaining.textContent = TIMER_DURATION; elements.progressBar.style.width = '100%';
             if (gameState.timer) clearInterval(gameState.timer);
-
             gameState.timer = setInterval(() => {
-                gameState.timeRemaining--;
-                elements.timeRemaining.textContent = gameState.timeRemaining;
-                
-                const percentage = (gameState.timeRemaining / TIMER_DURATION) * 100;
-                elements.progressBar.style.width = `${percentage}%`;
-
-                elements.progressBar.classList.remove('bg-red-500', 'bg-blue-600');
-                if (gameState.timeRemaining <= 10) {
-                     elements.progressBar.classList.add('bg-red-500'); 
-                } else {
-                     elements.progressBar.classList.add('bg-blue-600'); 
-                }
-
+                gameState.timeRemaining--; elements.timeRemaining.textContent = gameState.timeRemaining;
+                const percentage = (gameState.timeRemaining / TIMER_DURATION) * 100; elements.progressBar.style.width = `${percentage}%`;
+                elements.progressBar.classList.remove('bg-red-500','bg-blue-600');
+                if (gameState.timeRemaining <= 10) elements.progressBar.classList.add('bg-red-500'); else elements.progressBar.classList.add('bg-blue-600');
                 if (gameState.timeRemaining <= 0) {
                     clearInterval(gameState.timer);
                     if (!gameState.isAnswered) {
                         elements.feedbackMessage.textContent = '⏱️ Temps esgotat! La resposta era: ' + gameState.currentChordLabel;
-                        elements.feedbackMessage.classList.remove('text-green-400', 'text-yellow-400');
-                        elements.feedbackMessage.classList.add('text-red-400');
-                        elements.nextRoundButton.classList.remove('hidden');
-                        gameState.isAnswered = true;
-
-                        Array.from(elements.intervalOptions.children).forEach(btn => {
-                            if (btn.getAttribute('data-chord-type') === gameState.correctChordType) {
-                                btn.classList.add('bg-green-500', 'text-white', 'font-bold');
-                            }
-                            btn.disabled = true;
-                            btn.classList.add('cursor-not-allowed', 'opacity-80');
-                        });
+                        elements.feedbackMessage.classList.add('text-red-400'); elements.nextRoundButton.classList.remove('hidden'); gameState.isAnswered = true;
+                        Array.from(elements.intervalOptions.children).forEach(btn => { if (btn.getAttribute('data-chord-type') === gameState.correctChordType) btn.classList.add('bg-green-500','text-white','font-bold'); btn.disabled = true; btn.classList.add('cursor-not-allowed','opacity-80'); });
                     }
                 }
-            }, 1000); 
+            }, 1000);
         }
 
-        /**
-         * Tanca el joc i mostra la pantalla de resultats.
-         */
-        function endGame() {
-            clearInterval(gameState.timer);
-            elements.finalScore.textContent = gameState.score;
-            showScreen('result');
-        }
-        
-        /**
-         * Reinicia el joc a la pantalla de selecció de dificultat.
-         */
-        function resetGame() {
-            clearInterval(gameState.timer);
-            showScreen('difficulty');
-            gameState.score = 0;
-            gameState.round = 0;
-        }
+        function endGame() { clearInterval(gameState.timer); elements.finalScore.textContent = gameState.score; showScreen('result'); }
+        function resetGame() { clearInterval(gameState.timer); showScreen('difficulty'); gameState.score = 0; gameState.round = 0; }
 
-
-        // ===============================================
-        // INICIALITZACIÓ
-        // ===============================================
-
+        // Inicialització
         window.onload = function() {
-            elements.playButton.onclick = playChord; // Reprodueix l'acord actual
-
-            elements.nextRoundButton.onclick = () => {
-                const MAX_ROUNDS = 20; 
-                if (gameState.round >= MAX_ROUNDS) { 
-                    endGame();
-                } else {
-                    loadNextRound();
-                }
-            };
-
-            // INICIA LA PRECARREGA DE TOTS ELS MP3
-            checkAudioAccessibility();
+            elements.playButton.onclick = playChord;
+            elements.nextRoundButton.onclick = () => { const MAX_ROUNDS = 20; if (gameState.round >= MAX_ROUNDS) endGame(); else loadNextRound(); };
+            initializeHardChordsList();
+            // Mostrem pantalla de dificultat
+            screens.difficulty.classList.remove('opacity-0');
         };
-
     </script>
-
-
-<!-- modifier de carga para los moviles lentos! -->
-
-    <!-- retardo de 10s -->
-<script>
-window.addEventListener('load', () => {
-  setTimeout(() => {
-    if (typeof checkAudioAccessibility === 'function') checkAudioAccessibility();
-  }, 10000); // 10 s en lugar de 7 s
-});
-</script>
-
-    <!-- doble carga por si falla -->
-<script>
-window.addEventListener('load', () => {
-  // primera tanda tras 5 s
-  setTimeout(() => checkAudioAccessibility && checkAudioAccessibility(), 5000);
-  // segunda tanda tras 20 s (refresca los que fallaron)
-  setTimeout(() => checkAudioAccessibility && checkAudioAccessibility(), 20000);
-});
-</script>
 
 
     
