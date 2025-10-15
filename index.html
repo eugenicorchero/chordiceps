@@ -78,8 +78,8 @@
     <!-- Contenidor principal de l'aplicació: Fosc i amb ombra subtil -->
     <div id="appContainer" class="bg-gray-800 shadow-2xl rounded-xl w-full max-w-4xl p-8 md:p-12 border border-gray-700/50 mb-4 relative">
         
-        <!-- Overlay de càrrega (Visible fins que es comprova/precàrrega l'àudio) -->
-        <div id="loadingOverlay" class="loading-overlay">
+    <!-- Overlay de càrrega (Visible només quan escollim iniciar preload) -->
+    <div id="loadingOverlay" class="loading-overlay hidden">
             <p class="text-center font-semibold">Carregant fitxers d'àudio per a un joc instantani...</p>
             <div class="w-full bg-gray-600 rounded-full h-2.5 max-w-sm">
                 <div class="h-2.5 bg-blue-500 rounded-full transition-all duration-300" id="preloaderBar" style="width: 0%"></div>
