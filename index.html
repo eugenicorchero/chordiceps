@@ -329,43 +329,85 @@
             return `${AUDIO_PATH}${rawFileName}`;
         }
         
-        /**
-         * Precàrrega (Pre-load) de tots els fitxers d'àudio segons la configuració total.
-         */
-        function preloadAllAudio() {
-            return new Promise((resolve, reject) => {
-                const totalChords = ALL_CHORDS.length; 
-                const totalFilesToLoad = TOTAL_MIDI_ROOTS * totalChords; 
-                
-                let filesLoaded = 0;
-                let errors = 0;
-                let failedUrls = [];
+       /**
+ * Precàrrega (Pre-load) de tots els fitxers d'àudio segons la configuració total.
+ * Ara amb càrrega per lots (per compatibilitat amb iOS) i barra de progrés actualitzada.
+ */
+function preloadAllAudio(batchSize = 10) {
+    return new Promise(async (resolve, reject) => {
+        const totalChords = ALL_CHORDS.length;
+        const totalFilesToLoad = TOTAL_MIDI_ROOTS * totalChords;
 
-                const onLoaded = (isError, fileURL) => { 
+        let filesLoaded = 0;
+        let errors = 0;
+        let failedUrls = [];
+
+        console.log(`🔊 Iniciant precàrrega de ${totalFilesToLoad} arxius (lots de ${batchSize})...`);
+
+        // Mostrem elements de progrés
+        elements.loadingOverlay.classList.remove('hidden');
+        elements.preloaderBar.style.width = '0%';
+        elements.preloaderStatus.textContent = 'Carregant àudios...';
+
+        // Creem una llista amb totes les rutes d’àudio
+        const allAudioURLs = [];
+        for (let rootIndex = 0; rootIndex < TOTAL_MIDI_ROOTS; rootIndex++) {
+            for (let chordIndex = 0; chordIndex < totalChords; chordIndex++) {
+                const fileURL = getChordAudioURL(rootIndex, ALL_CHORDS[chordIndex]);
+                allAudioURLs.push(fileURL);
+            }
+        }
+
+        // Funció per actualitzar la barra i el text
+        const updateProgress = () => {
+            const percentage = Math.round((filesLoaded / totalFilesToLoad) * 100);
+            elements.preloaderBar.style.width = `${percentage}%`;
+            elements.preloaderStatus.textContent = 
+                `Carregats ${filesLoaded}/${totalFilesToLoad} acords. ${errors > 0 ? '(' + errors + ' errors)' : ''}`;
+        };
+
+        // Càrrega en lots per evitar saturar Safari / iOS
+        for (let i = 0; i < allAudioURLs.length; i += batchSize) {
+            const batch = allAudioURLs.slice(i, i + batchSize);
+
+            const promises = batch.map(fileURL => new Promise(resolveBatch => {
+                const audio = new Audio(fileURL);
+                audio.preload = 'auto';
+
+                const onFinish = (isError) => {
                     filesLoaded++;
                     if (isError) {
                         errors++;
-                        console.warn(`Fallada en carregar: ${fileURL}`);
+                        failedUrls.push(fileURL);
+                        console.warn(`⚠️ Fallada en carregar: ${fileURL}`);
                     }
-                    
-                    const percentage = Math.round((filesLoaded / totalFilesToLoad) * 100);
-                    elements.preloaderBar.style.width = `${percentage}%`;
-                    elements.preloaderStatus.textContent = `Carregats ${filesLoaded}/${totalFilesToLoad} acords. ${errors > 0 ? '(' + errors + ' errors)' : ''}`;
-
-                    if (filesLoaded === totalFilesToLoad) {
-                        if (errors === 0) {
-                            console.log("Precàrrega OK: Tots els fitxers d'acord s'han trobat.");
-                            resolve();
-                        } else {
-                            console.warn(`Precàrrega finalitzada amb ${errors} fitxers fallits.`);
-                            
-                            reject({
-                                errorCount: errors,
-                                failedUrls: failedUrls
-                            });
-                        }
-                    }
+                    updateProgress();
+                    resolveBatch();
                 };
+
+                audio.oncanplaythrough = () => onFinish(false);
+                audio.onerror = () => onFinish(true);
+                audio.load();
+            }));
+
+            await Promise.all(promises);
+            await new Promise(r => setTimeout(r, 200)); // petita pausa entre lots
+        }
+
+        // Resultat final
+        if (errors === 0) {
+            console.log("✅ Precàrrega OK: Tots els fitxers d'acord s'han carregat correctament.");
+            elements.preloaderStatus.textContent = 'Precàrrega completada. Preparant joc...';
+            setTimeout(resolve, 800);
+        } else {
+            console.warn(`⚠️ Precàrrega finalitzada amb ${errors} fitxers fallits.`);
+            console.table(failedUrls);
+            elements.preloaderStatus.textContent = `Precàrrega finalitzada amb ${errors} errors.`;
+            reject({ errorCount: errors, failedUrls });
+        }
+    });
+}
+
 
                 // Bucle per a TOTES les combinacions possibles (12 Fonamentals x 10 Acords)
                 for (let midi = MIDI_START; midi <= MIDI_END; midi++) {
@@ -756,92 +798,6 @@
         };
 
     </script>
-
-
-<!-- modifier de carga para los moviles lentos! -->
-
-<!-- Overlay de carga / error -->
-<div id="mobile-audio-loader" style="position:fixed;inset:0;background:#000;color:#fff;
-display:flex;flex-direction:column;align-items:center;justify-content:center;
-font-family:sans-serif;font-size:1.2rem;z-index:99999;text-align:center;">
-  <div id="loader-text">Carregant àudios, si us plau espera...</div>
-  <div id="loader-bar" style="width:80%;height:8px;background:#333;margin-top:16px;">
-    <div id="loader-fill" style="height:100%;width:0%;background:#4caf50;transition:width 0.2s;"></div>
-  </div>
-  <button id="retry-button" style="margin-top:24px;padding:8px 16px;font-size:1rem;
-  background:#444;color:#fff;border:none;border-radius:4px;display:none;">Reintentar</button>
-</div>
-
-<script>
-(function(){
-  let retryCount = 0;
-  const overlay = document.getElementById('mobile-audio-loader');
-  const text = document.getElementById('loader-text');
-  const bar = document.getElementById('loader-fill');
-  const retryBtn = document.getElementById('retry-button');
-
-  // función para animar la barra de carga durante el retardo
-  function animateBar(duration=15000) {
-    let start = Date.now();
-    function frame(){
-      const progress = Math.min(1, (Date.now()-start)/duration);
-      bar.style.width = (progress*100)+'%';
-      if(progress<1) requestAnimationFrame(frame);
-    }
-    frame();
-  }
-
-  // función que lanza la comprobación tras el retardo
-  function tryLoadAudios(delay=15000) {
-    animateBar(delay);
-    text.textContent = 'Carregant àudios, si us plau espera...';
-    retryBtn.style.display='none';
-    setTimeout(() => {
-      // comprobem si la funció del joc existeix
-      if (typeof checkAudioAccessibility === 'function') {
-        checkAudioAccessibility();
-      }
-
-      // revisem després d'uns segons si encara hi ha errors (el teu joc marca això a alguna variable?)
-      // Si no hi ha variable pública, simplement mirem si s'ha cridat hideAudioErrorPopup()
-      setTimeout(() => {
-        const errorPopup = document.querySelector('.audio-error-popup, #audioErrorPopup');
-        const visibleError = errorPopup && errorPopup.style.display !== 'none' && !errorPopup.classList.contains('hidden');
-
-        if (visibleError) {
-          // hi ha error → mostrar reintentar o missatge final
-          if (retryCount === 0) {
-            text.textContent = 'No s’han pogut carregar alguns àudios. Vols provar-ho de nou?';
-            retryBtn.textContent = 'Reintentar';
-            retryBtn.style.display = 'inline-block';
-          } else {
-            text.textContent = 'Els àudios segueixen sense carregar-se correctament. Prova-ho des d’un ordinador per millor rendiment.';
-            retryBtn.style.display = 'none';
-          }
-        } else {
-          // tot correcte → ocultar overlay
-          overlay.style.display = 'none';
-        }
-      }, 3000); // espera uns segons per permetre que es mostri l'error intern
-    }, delay);
-  }
-
-  retryBtn.addEventListener('click', () => {
-    retryCount++;
-    tryLoadAudios(15000);
-  });
-
-  // només mostrar aquest overlay si detectem que és un dispositiu mòbil
-  if (/Mobi|Android|iPhone|iPad/i.test(navigator.userAgent)) {
-    window.addEventListener('load', () => {
-      overlay.style.display = 'flex';
-      tryLoadAudios(15000);
-    });
-  } else {
-    overlay.style.display = 'none';
-  }
-})();
-</script>
 
 
     
