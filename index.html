@@ -329,11 +329,11 @@
             return `${AUDIO_PATH}${rawFileName}`;
         }
         
-       /**
+/**
  * Precàrrega (Pre-load) de tots els fitxers d'àudio segons la configuració total.
- * Ara amb càrrega per lots (per compatibilitat amb iOS) i barra de progrés actualitzada.
+ * Carrega per lots i popula audioCache amb claus `${midi}-${chordType}`.
  */
-function preloadAllAudio(batchSize = 10) {
+function preloadAllAudio(batchSize = 8) {
     return new Promise(async (resolve, reject) => {
         const totalChords = ALL_CHORDS.length;
         const totalFilesToLoad = TOTAL_MIDI_ROOTS * totalChords;
@@ -349,12 +349,14 @@ function preloadAllAudio(batchSize = 10) {
         elements.preloaderBar.style.width = '0%';
         elements.preloaderStatus.textContent = 'Carregant àudios...';
 
-        // Creem una llista amb totes les rutes d’àudio
-        const allAudioURLs = [];
-        for (let rootIndex = 0; rootIndex < TOTAL_MIDI_ROOTS; rootIndex++) {
-            for (let chordIndex = 0; chordIndex < totalChords; chordIndex++) {
-                const fileURL = getChordAudioURL(rootIndex, ALL_CHORDS[chordIndex]);
-                allAudioURLs.push(fileURL);
+        // Creem la llista d'URLs i també la informació de les claus (midi,chord)
+        const allItems = [];
+        for (let midi = MIDI_START; midi <= MIDI_END; midi++) {
+            for (let ci = 0; ci < totalChords; ci++) {
+                const chordType = ALL_CHORDS[ci];
+                const fileURL = getFileName(midi, chordType); // CORRECTE
+                const fileKey = `${midi}-${chordType}`;
+                allItems.push({ midi, chordType, fileURL, fileKey });
             }
         }
 
@@ -362,24 +364,27 @@ function preloadAllAudio(batchSize = 10) {
         const updateProgress = () => {
             const percentage = Math.round((filesLoaded / totalFilesToLoad) * 100);
             elements.preloaderBar.style.width = `${percentage}%`;
-            elements.preloaderStatus.textContent = 
+            elements.preloaderStatus.textContent =
                 `Carregats ${filesLoaded}/${totalFilesToLoad} acords. ${errors > 0 ? '(' + errors + ' errors)' : ''}`;
         };
 
-        // Càrrega en lots per evitar saturar Safari / iOS
-        for (let i = 0; i < allAudioURLs.length; i += batchSize) {
-            const batch = allAudioURLs.slice(i, i + batchSize);
+        // Càrrega per lots
+        for (let i = 0; i < allItems.length; i += batchSize) {
+            const batch = allItems.slice(i, i + batchSize);
 
-            const promises = batch.map(fileURL => new Promise(resolveBatch => {
-                const audio = new Audio(fileURL);
+            const promises = batch.map(item => new Promise(resolveBatch => {
+                const audio = new Audio(item.fileURL);
                 audio.preload = 'auto';
+
+                // Guardem l'objecte a la cache AMB LA MATEIXA CLAU que busca el joc
+                audioCache[item.fileKey] = audio;
 
                 const onFinish = (isError) => {
                     filesLoaded++;
                     if (isError) {
                         errors++;
-                        failedUrls.push(fileURL);
-                        console.warn(`⚠️ Fallada en carregar: ${fileURL}`);
+                        failedUrls.push(item.fileURL);
+                        console.warn(`⚠️ Fallada en carregar: ${item.fileURL}`);
                     }
                     updateProgress();
                     resolveBatch();
@@ -387,18 +392,29 @@ function preloadAllAudio(batchSize = 10) {
 
                 audio.oncanplaythrough = () => onFinish(false);
                 audio.onerror = () => onFinish(true);
-                audio.load();
+
+                // En alguns navegadors el .load() pot ser redundant però el deixem per forçar la precàrrega
+                try {
+                    audio.load();
+                } catch (e) {
+                    // Si load llança, considerem error i continuem
+                    console.warn('audio.load() ha llençat una excepció per', item.fileURL, e);
+                    onFinish(true);
+                }
             }));
 
+            // Esperem a que el lot acabi
             await Promise.all(promises);
-            await new Promise(r => setTimeout(r, 200)); // petita pausa entre lots
+
+            // Petita pausa per evitar saturació (augmentar si cal)
+            await new Promise(r => setTimeout(r, 250));
         }
 
         // Resultat final
         if (errors === 0) {
             console.log("✅ Precàrrega OK: Tots els fitxers d'acord s'han carregat correctament.");
             elements.preloaderStatus.textContent = 'Precàrrega completada. Preparant joc...';
-            setTimeout(resolve, 800);
+            setTimeout(resolve, 600);
         } else {
             console.warn(`⚠️ Precàrrega finalitzada amb ${errors} fitxers fallits.`);
             console.table(failedUrls);
