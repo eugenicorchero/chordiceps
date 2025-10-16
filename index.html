@@ -69,15 +69,7 @@
 <body class="bg-gray-950 min-h-screen flex flex-col items-center justify-center p-4">
 
     <!-- POP-UP d'ERROR D'AUDIO -->
-    <div id="audioErrorPopup" class="audio-error-popup hidden bg-red-600 text-white p-3 rounded-lg shadow-xl max-w-sm transition duration-300 transform scale-100">
-        <p class="font-bold mb-1">⚠️ Error de Precàrrega</p>
-        <p id="audioErrorMessage" class="text-sm">No s'han pogut carregar tots els fitxers d'acord.</p>
-        <p class="text-xs mt-1 opacity-80">Revisa la nomenclatura de l'arxiu que no es troba.</p>
-        <div class="mt-2 flex gap-2">
-            <button id="showErrorsBtn" class="bg-white text-red-600 px-3 py-1 rounded">Mostra errors</button>
-            <button id="retryErrorsBtn" class="bg-white text-red-600 px-3 py-1 rounded">Reintenta</button>
-        </div>
-    </div>
+    <!-- Error popup removed as requested -->
 
     <!-- Contenidor principal de l'aplicació: Fosc i amb ombra subtil -->
     <div id="appContainer" class="bg-gray-800 shadow-2xl rounded-xl w-full max-w-4xl p-8 md:p-12 border border-gray-700/50 mb-4 relative">
@@ -303,6 +295,10 @@
                 this.cache = new Map(); // key -> HTMLAudioElement
                 this.loading = new Map(); // key -> Promise
                 this.failedUrls = new Set();
+                // sprite support
+                this.spriteMap = null; // mapping key -> { sprite: 'sprites/part1.mp3', offset: 0, duration: 1.2 }
+                this.spriteBuffers = new Map(); // spriteUrl -> AudioBuffer
+                this.useSprites = false;
             }
 
             fileKey(midi, chord) { return `${midi}-${chord}`; }
@@ -438,12 +434,27 @@
                 const initialList = [];
                 const remainingList = [];
 
-                allRoots.forEach(midi => {
-                    chords.forEach(chord => {
-                        const item = { midi, chord };
-                        if (initialRootSet.includes(midi)) initialList.push(item); else remainingList.push(item);
+                // If sprites are used, convert mapping to sprite-oriented lists to minimize requests
+                if (this.useSprites && this.spriteMap) {
+                    const spriteSet = new Set();
+                    Object.keys(this.spriteMap).forEach(k => {
+                        const entry = this.spriteMap[k];
+                        if (chords.includes(k.split('-')[1])) spriteSet.add(entry.sprite);
                     });
-                });
+                    const spriteArray = Array.from(spriteSet);
+                    // initial list: subset of spriteArray based on initialRootSet size
+                    const stepS = Math.max(1, Math.floor(spriteArray.length / initialRoots));
+                    const initialSpriteSet = spriteArray.filter((_, idx) => idx % stepS === 0).slice(0, initialRoots);
+                    initialSpriteSet.forEach(s => initialList.push({ sprite: s }));
+                    spriteArray.forEach(s => { if (!initialSpriteSet.includes(s)) remainingList.push({ sprite: s }); });
+                } else {
+                    allRoots.forEach(midi => {
+                        chords.forEach(chord => {
+                            const item = { midi, chord };
+                            if (initialRootSet.includes(midi)) initialList.push(item); else remainingList.push(item);
+                        });
+                    });
+                }
 
                 let loaded = 0; let failed = 0; const failedUrls = [];
 
@@ -458,9 +469,17 @@
                             const concurrencyToUse = concurrencyOverride || this.concurrency;
                             while (active < concurrencyToUse && i < items.length) {
                                 const it = items[i++]; active++;
-                                this.loadOne(it.midi, it.chord).then(res => {
+                                const p = it.sprite ? this.loadSprite(it.sprite) : this.loadOne(it.midi, it.chord);
+                                p.then(res => {
                                     active--;
-                                    if (!res.ok) { failed++; failedUrls.push(res.url); }
+                                    // loadSprite resolves with buffer, loadOne resolves with {ok}/audio — normalize
+                                    if (res && res.ok === false) { failed++; failedUrls.push(res.url || it.sprite); }
+                                    loaded++;
+                                    if (reportEach) update();
+                                    setTimeout(next, 0);
+                                }).catch(err => {
+                                    active--;
+                                    failed++; failedUrls.push(it.sprite || this.fileUrl(it.midi, it.chord));
                                     loaded++;
                                     if (reportEach) update();
                                     setTimeout(next, 0);
@@ -500,7 +519,55 @@
                     this.promote(key);
                     return Promise.resolve(this.cache.get(key));
                 }
+                // If sprites are available and mapping contains the key, try to ensure sprite buffer is loaded and return a placeholder object
+                if (this.useSprites && this.spriteMap && this.spriteMap[key]) {
+                    const spriteUrl = this.spriteMap[key].sprite;
+                    return this.loadSprite(spriteUrl).then(() => Promise.reject(new Error('sprite')));
+                    // Note: when using sprites, playback uses playFromSprite(), not HTMLAudioElement returned here.
+                }
                 return this.loadOne(midi, chord).then(res => res.ok ? res.audio : Promise.reject(new Error('load failed')));
+            }
+
+            // SPRITE: load mapping JSON
+            loadSpriteMap(url) {
+                return fetch(url).then(r => { if (!r.ok) throw new Error('map fetch failed'); return r.json(); }).then(json => {
+                    this.spriteMap = json;
+                    this.useSprites = true;
+                    return json;
+                });
+            }
+
+            // SPRITE: load and decode a sprite audio file
+            loadSprite(spriteUrl) {
+                if (this.spriteBuffers.has(spriteUrl)) return Promise.resolve(this.spriteBuffers.get(spriteUrl));
+                // ensure only one loading promise per sprite
+                if (this.loading.has('sprite:' + spriteUrl)) return this.loading.get('sprite:' + spriteUrl);
+                const p = fetch(spriteUrl).then(r => { if (!r.ok) throw new Error('sprite fetch failed'); return r.arrayBuffer(); }).then(ab => {
+                    return new Promise((resolve, reject) => {
+                        if (!audioCtx) return reject(new Error('no audioCtx'));
+                        audioCtx.decodeAudioData(ab, buf => { this.spriteBuffers.set(spriteUrl, buf); this.loading.delete('sprite:' + spriteUrl); resolve(buf); }, err => { this.loading.delete('sprite:' + spriteUrl); reject(err); });
+                    });
+                }).catch(err => { this.loading.delete('sprite:' + spriteUrl); this.failedUrls.add(spriteUrl); throw err; });
+                this.loading.set('sprite:' + spriteUrl, p);
+                return p;
+            }
+
+            // Play a segment from a loaded sprite buffer
+            playFromSprite(key) {
+                if (!this.spriteMap || !this.spriteMap[key]) return Promise.reject(new Error('no mapping'));
+                const info = this.spriteMap[key];
+                const spriteUrl = info.sprite;
+                const buf = this.spriteBuffers.get(spriteUrl);
+                if (!buf) return Promise.reject(new Error('sprite not loaded'));
+                if (!audioCtx) return Promise.reject(new Error('no audioCtx'));
+                const src = audioCtx.createBufferSource();
+                src.buffer = buf;
+                const gain = audioCtx.createGain();
+                gain.gain.setValueAtTime(1, audioCtx.currentTime);
+                src.connect(gain); gain.connect(audioCtx.destination);
+                src.start(0, info.offset, info.duration);
+                // no need to keep reference; it stops automatically
+                return Promise.resolve();
             }
         }
 
@@ -510,11 +577,7 @@
         // -----------------------------------------------
         // Utils d'àudio i integració amb la UI
         // -----------------------------------------------
-        function showAudioErrorPopup(message) {
-            elements.audioErrorMessage.textContent = message;
-            elements.audioErrorPopup.classList.remove('hidden');
-            setTimeout(() => elements.audioErrorPopup.classList.add('hidden'), 15000);
-        }
+        // Error popup removed; log errors to console only
 
         function getRootName(midiNumber) {
             const notesMap = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
@@ -529,12 +592,23 @@
             if (!midi || !chord) return;
 
             try {
-                const audio = await audioLoader.getAudio(midi, chord);
-                audio.pause(); audio.currentTime = 0;
-                const p = audio.play();
-                if (p && p.catch) p.catch(e => {
-                    if (e.name === 'NotAllowedError') elements.feedbackMessage.textContent = '🔊 Fes clic a Play per permetre àudio.';
-                });
+                    // If sprites available and mapping exists, play from sprite buffer
+                    const key = `${midi}-${chord}`;
+                    if (audioLoader.useSprites && audioLoader.spriteMap && audioLoader.spriteMap[key]) {
+                        try {
+                            await audioLoader.playFromSprite(key);
+                            return;
+                        } catch (e) {
+                            console.warn('Sprite playback failed, falling back to file', e);
+                        }
+                    }
+
+                    const audio = await audioLoader.getAudio(midi, chord);
+                    audio.pause(); audio.currentTime = 0;
+                    const p = audio.play();
+                    if (p && p.catch) p.catch(e => {
+                        if (e.name === 'NotAllowedError') elements.feedbackMessage.textContent = '🔊 Fes clic a Play per permetre àudio.';
+                    });
             } catch (e) {
                 elements.feedbackMessage.textContent = '🔊 Àudio no disponible (s’està intentant carregar). Reproduint fallback sintètic.';
                 // Log failed URL for later inspection
@@ -618,6 +692,14 @@
             elements.preloaderBar.style.width = '0%';
             elements.preloaderStatus.textContent = 'Preparant àudios...';
 
+            // If a sprite map exists in repository, load it first (non-blocking)
+            const spriteMapUrl = AUDIO_PATH + 'sprites/map.json';
+            audioLoader.loadSpriteMap(spriteMapUrl).then(map => {
+                console.log('Sprite map loaded, using sprites for playback');
+            }).catch(() => {
+                // no sprite map found — fallback to individual files
+            });
+
             audioLoader.preloadForDifficulty(difficulty, {
                 initialRoots: (difficulty === 'hard') ? (isMobile ? 6 : 12) : (isMobile ? 4 : 8),
                 concurrency: (difficulty === 'hard') ? (isMobile ? 2 : 6) : undefined,
@@ -626,7 +708,7 @@
                     // show progress relative to initial stage first, then overall
                     const pct = Math.round((loaded / Math.max(1, totalInitial)) * 100);
                     elements.preloaderBar.style.width = `${Math.min(100, pct)}%`;
-                    elements.preloaderStatus.textContent = `Carregats ${loaded}/${totalInitial} (inicial). Errors: ${failed} (fails: ${audioLoader.failedUrls.size})`;
+                    elements.preloaderStatus.textContent = (audioLoader.useSprites ? `Carregats ${loaded}/${totalInitial} sprites (inicial). Errors: ${failed}` : `Carregats ${loaded}/${totalInitial} (inicial). Errors: ${failed} (fails: ${audioLoader.failedUrls.size})`);
                 }
             }).then(({ failed, failedUrls } = {}) => {
                 gameState.isAudioReady = true;
@@ -636,7 +718,7 @@
             }).catch(e => {
                 gameState.isAudioReady = false;
                 elements.loadingOverlay.classList.add('hidden');
-                showAudioErrorPopup('No s\'han pogut carregar alguns àudios. El joc intentarà carregar sota demanda. Errors totals: ' + audioLoader.failedUrls.size);
+                console.warn('No s\'han pogut carregar alguns àudios. El joc intentarà carregar sota demanda. Errors totals:', audioLoader.failedUrls.size);
                 showScreen('quiz');
                 loadNextRound();
             });
@@ -675,16 +757,28 @@
             const midi = gameState.baseNoteMIDI;
             const chord = gameState.correctChordType;
             const key = `${midi}-${chord}`;
+
+            if (audioLoader.useSprites && audioLoader.spriteMap && audioLoader.spriteMap[key]) {
+                // ensure sprite buffer loaded
+                const spriteUrl = audioLoader.spriteMap[key].sprite;
+                elements.feedbackMessage.textContent = '🔄 Carregant sprite...';
+                try {
+                    await audioLoader.loadSprite(spriteUrl);
+                } catch (e) {
+                    console.warn('Sprite carregament fallit', spriteUrl, e);
+                }
+                if (gameState.isAudioReady) await playChord();
+                return;
+            }
+
             if (!audioLoader.isLoadedKey(key)) {
                 elements.feedbackMessage.textContent = '🔄 Carregant àudio...';
                 try {
-                    // intent amb timeout (5s) i 1 retry
                     await Promise.race([
                         audioLoader.getAudio(midi, chord),
                         new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 5000))
                     ]);
                 } catch (e) {
-                    // retry once quickly
                     try { await audioLoader.getAudio(midi, chord); } catch (e2) { elements.feedbackMessage.textContent = '⚠️ Àudio no disponible per a aquesta ronda.'; }
                 }
             }
