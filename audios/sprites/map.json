@@ -1,0 +1,5 @@
+{
+  "48-Maj": { "sprite": "./audios/sprites/part1.mp3", "offset": 0.0, "duration": 1.8 },
+  "49-Maj": { "sprite": "./audios/sprites/part1.mp3", "offset": 1.8, "duration": 1.8 },
+  "50-Maj": { "sprite": "./audios/sprites/part1.mp3", "offset": 3.6, "duration": 1.8 }
+}

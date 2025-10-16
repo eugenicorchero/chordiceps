@@ -206,6 +206,18 @@
 
     // Create a shared AudioContext early so we can decode audio buffers and play via WebAudio
     const audioCtx = (window.AudioContext || window.webkitAudioContext) ? new (window.AudioContext || window.webkitAudioContext)() : null;
+    let audioUnlocked = false;
+
+    // Resume AudioContext on first user gesture (required on many mobile browsers)
+    async function ensureAudioUnlocked() {
+        if (!audioCtx || audioUnlocked) return;
+        try {
+            if (audioCtx.state === 'suspended') await audioCtx.resume();
+            audioUnlocked = true;
+        } catch (e) {
+            // ignore - will try again on next gesture
+        }
+    }
 
     // Register a lightweight service worker (in-page blob) to cache audio files and serve them cache-first.
     (function registerSW(){
@@ -298,6 +310,7 @@
                 // sprite support
                 this.spriteMap = null; // mapping key -> { sprite: 'sprites/part1.mp3', offset: 0, duration: 1.2 }
                 this.spriteBuffers = new Map(); // spriteUrl -> AudioBuffer
+                this.bufferCache = new Map(); // key -> AudioBuffer for individual files (mobile optimized)
                 this.useSprites = false;
             }
 
@@ -333,7 +346,7 @@
 
             getIfLoaded(key) { return this.cache.get(key); }
 
-            // Carrega un fitxer i retorna Promise que resol amb l'element Audio
+            // Carrega un fitxer i retorna Promise que resol amb l'element Audio o un buffer (mobile)
             loadOne(midi, chord) {
                 const key = this.fileKey(midi, chord);
                 if (this.cache.has(key)) {
@@ -369,42 +382,67 @@
                     });
 
                     const createAudioElement = () => {
-                                // Fetch the audio as blob - this will populate the SW cache if available
-                                fetch(url).then(resp => {
-                                    if (!resp || !resp.ok) throw new Error('fetch failed');
-                                    return resp.blob();
-                                }).then(blob => {
-                                    const objectUrl = URL.createObjectURL(blob);
-                                    const audio = new Audio();
-                                    audio.preload = 'auto';
-                                    audio.src = objectUrl;
-
-                                    const clean = () => {
-                                        audio.oncanplaythrough = null;
-                                        audio.onerror = null;
-                                    };
-
-                                    audio.oncanplaythrough = () => {
-                                        clean();
-                                        this.cache.set(key, audio);
-                                        this.promote(key);
-                                        this.ensureCacheLimit();
-                                        this.loading.delete(key);
-                                        resolve({ key, audio, ok: true, url });
-                                    };
-                                    audio.onerror = () => {
-                                        clean();
-                                        this.loading.delete(key);
-                                        this.failedUrls.add(url);
-                                        try { URL.revokeObjectURL(objectUrl); } catch(e) {}
-                                        resolve({ key, audio: null, ok: false, url });
-                                    };
-                                    try { audio.load(); } catch(e) { this.failedUrls.add(url); resolve({ key, audio: null, ok: false, url }); }
-                                }).catch(() => {
-                                    this.loading.delete(key);
-                                    this.failedUrls.add(url);
-                                    resolve({ key, audio: null, ok: false, url });
+                        // On mobile devices prefer decoding into AudioBuffer (fewer DOM audio objects, more reliable)
+                        if (isMobile && audioCtx) {
+                            fetch(url).then(resp => { if (!resp || !resp.ok) throw new Error('fetch failed'); return resp.arrayBuffer(); }).then(ab => {
+                                return new Promise((resDecode, rejDecode) => {
+                                    audioCtx.decodeAudioData(ab, decoded => resDecode(decoded), err => rejDecode(err));
                                 });
+                            }).then(decodedBuffer => {
+                                this.bufferCache.set(key, decodedBuffer);
+                                // store a lightweight marker in cache so isLoadedKey works
+                                this.cache.set(key, { __buffer: true });
+                                this.promote(key);
+                                this.ensureCacheLimit();
+                                this.loading.delete(key);
+                                resolve({ key, buffer: decodedBuffer, ok: true, url });
+                            }).catch(() => {
+                                // Fallback to traditional Audio element if decode or fetch failed
+                                fetchAsAudioElement();
+                            });
+                        } else {
+                            // Desktop/non-mobile path: fetch as blob then use HTMLAudioElement
+                            fetchAsAudioElement();
+                        }
+                    };
+
+                    const fetchAsAudioElement = () => {
+                        // Fetch the audio as blob - this will populate the SW cache if available
+                        fetch(url).then(resp => {
+                            if (!resp || !resp.ok) throw new Error('fetch failed');
+                            return resp.blob();
+                        }).then(blob => {
+                            const objectUrl = URL.createObjectURL(blob);
+                            const audio = new Audio();
+                            audio.preload = 'auto';
+                            audio.src = objectUrl;
+
+                            const clean = () => {
+                                audio.oncanplaythrough = null;
+                                audio.onerror = null;
+                            };
+
+                            audio.oncanplaythrough = () => {
+                                clean();
+                                this.cache.set(key, audio);
+                                this.promote(key);
+                                this.ensureCacheLimit();
+                                this.loading.delete(key);
+                                resolve({ key, audio, ok: true, url });
+                            };
+                            audio.onerror = () => {
+                                clean();
+                                this.loading.delete(key);
+                                this.failedUrls.add(url);
+                                try { URL.revokeObjectURL(objectUrl); } catch(e) {}
+                                resolve({ key, audio: null, ok: false, url });
+                            };
+                            try { audio.load(); } catch(e) { this.failedUrls.add(url); resolve({ key, audio: null, ok: false, url }); }
+                        }).catch(() => {
+                            this.loading.delete(key);
+                            this.failedUrls.add(url);
+                            resolve({ key, audio: null, ok: false, url });
+                        });
                     };
                 });
 
@@ -517,6 +555,8 @@
                 const key = this.fileKey(midi, chord);
                 if (this.cache.has(key)) {
                     this.promote(key);
+                    // If a decoded buffer exists return it
+                    if (this.bufferCache && this.bufferCache.has && this.bufferCache.has(key)) return Promise.resolve({ key, buffer: this.bufferCache.get(key), ok: true });
                     return Promise.resolve(this.cache.get(key));
                 }
                 // If sprites are available and mapping contains the key, try to ensure sprite buffer is loaded and return a placeholder object
@@ -525,7 +565,25 @@
                     return this.loadSprite(spriteUrl).then(() => Promise.reject(new Error('sprite')));
                     // Note: when using sprites, playback uses playFromSprite(), not HTMLAudioElement returned here.
                 }
-                return this.loadOne(midi, chord).then(res => res.ok ? res.audio : Promise.reject(new Error('load failed')));
+                return this.loadOne(midi, chord).then(res => {
+                    if (!res || res.ok === false) return Promise.reject(new Error('load failed'));
+                    if (res.buffer) return { key: res.key, buffer: res.buffer, ok: true };
+                    return res.audio ? res.audio : Promise.reject(new Error('no-audio'));
+                });
+            }
+
+            // Play an AudioBuffer previously decoded for an individual file
+            playBuffer(key) {
+                const buf = this.bufferCache ? this.bufferCache.get(key) : null;
+                if (!buf) return Promise.reject(new Error('buffer-not-loaded'));
+                if (!audioCtx) return Promise.reject(new Error('no-audioctx'));
+                const src = audioCtx.createBufferSource();
+                src.buffer = buf;
+                const gain = audioCtx.createGain();
+                gain.gain.setValueAtTime(1, audioCtx.currentTime);
+                src.connect(gain); gain.connect(audioCtx.destination);
+                src.start(0);
+                return Promise.resolve();
             }
 
             // SPRITE: load mapping JSON
@@ -603,12 +661,30 @@
                         }
                     }
 
-                    const audio = await audioLoader.getAudio(midi, chord);
-                    audio.pause(); audio.currentTime = 0;
-                    const p = audio.play();
-                    if (p && p.catch) p.catch(e => {
-                        if (e.name === 'NotAllowedError') elements.feedbackMessage.textContent = '🔊 Fes clic a Play per permetre àudio.';
-                    });
+                    // Ensure audio context unlocked (mobile) before playing buffers
+                    await ensureAudioUnlocked();
+
+                    const loaded = await audioLoader.getAudio(midi, chord);
+                    // If loader returned a buffer, play via WebAudio buffer path
+                    if (loaded && loaded.buffer) {
+                        try {
+                            await audioLoader.playBuffer(`${midi}-${chord}`);
+                            return;
+                        } catch (e) {
+                            console.warn('Buffer playback failed, will try HTMLAudio if available', e);
+                        }
+                    }
+                    // If loader returned an HTMLAudioElement
+                    if (loaded && loaded instanceof HTMLAudioElement) {
+                        const audio = loaded;
+                        try { audio.pause(); } catch(e) {}
+                        try { audio.currentTime = 0; } catch(e) {}
+                        const p = audio.play();
+                        if (p && p.catch) p.catch(e => {
+                            if (e.name === 'NotAllowedError') elements.feedbackMessage.textContent = '🔊 Fes clic a Play per permetre àudio.';
+                        });
+                        return;
+                    }
             } catch (e) {
                 elements.feedbackMessage.textContent = '🔊 Àudio no disponible (s’està intentant carregar). Reproduint fallback sintètic.';
                 // Log failed URL for later inspection
@@ -843,7 +919,12 @@
 
         // Inicialització
         window.onload = function() {
-            elements.playButton.onclick = playChord;
+                // ensure first gesture unlocks audio on mobile
+                elements.playButton.onclick = async function(e) {
+                    await ensureAudioUnlocked();
+                    // small delay to allow resumed state to settle
+                    setTimeout(() => { playChord(); }, 50);
+                };
             elements.nextRoundButton.onclick = () => { const MAX_ROUNDS = 20; if (gameState.round >= MAX_ROUNDS) endGame(); else loadNextRound(); };
             initializeHardChordsList();
             // Mostrem pantalla de dificultat
