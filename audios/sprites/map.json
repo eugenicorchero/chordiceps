@@ -1,5 +1,602 @@
 {
-  "48-Maj": { "sprite": "./audios/sprites/part1.mp3", "offset": 0.0, "duration": 1.8 },
-  "49-Maj": { "sprite": "./audios/sprites/part1.mp3", "offset": 1.8, "duration": 1.8 },
-  "50-Maj": { "sprite": "./audios/sprites/part1.mp3", "offset": 3.6, "duration": 1.8 }
+  "57-Aug": {
+    "sprite": "./audios/A3-Aug.mp3",
+    "offset": 0,
+    "duration": 0
+  },
+  "57-AugM7": {
+    "sprite": "./audios/A3-AugM7.mp3",
+    "offset": 0,
+    "duration": 0
+  },
+  "57-Dim": {
+    "sprite": "./audios/A3-Dim.mp3",
+    "offset": 0,
+    "duration": 0
+  },
+  "57-Dim7": {
+    "sprite": "./audios/A3-Dim7.mp3",
+    "offset": 0,
+    "duration": 0
+  },
+  "57-Dom7": {
+    "sprite": "./audios/A3-Dom7.mp3",
+    "offset": 0,
+    "duration": 0
+  },
+  "57-Maj": {
+    "sprite": "./audios/A3-Maj.mp3",
+    "offset": 0,
+    "duration": 0
+  },
+  "57-Maj7": {
+    "sprite": "./audios/A3-Maj7.mp3",
+    "offset": 0,
+    "duration": 0
+  },
+  "57-Men": {
+    "sprite": "./audios/A3-Men.mp3",
+    "offset": 0,
+    "duration": 0
+  },
+  "57-Men7": {
+    "sprite": "./audios/A3-Men7.mp3",
+    "offset": 0,
+    "duration": 0
+  },
+  "57-m7b5": {
+    "sprite": "./audios/A3-m7b5.mp3",
+    "offset": 0,
+    "duration": 0
+  },
+  "58-Aug": {
+    "sprite": "./audios/As3-Aug.mp3",
+    "offset": 0,
+    "duration": 0
+  },
+  "58-AugM7": {
+    "sprite": "./audios/As3-AugM7.mp3",
+    "offset": 0,
+    "duration": 0
+  },
+  "58-Dim": {
+    "sprite": "./audios/As3-Dim.mp3",
+    "offset": 0,
+    "duration": 0
+  },
+  "58-Dim7": {
+    "sprite": "./audios/As3-Dim7.mp3",
+    "offset": 0,
+    "duration": 0
+  },
+  "58-Dom7": {
+    "sprite": "./audios/As3-Dom7.mp3",
+    "offset": 0,
+    "duration": 0
+  },
+  "58-Maj": {
+    "sprite": "./audios/As3-Maj.mp3",
+    "offset": 0,
+    "duration": 0
+  },
+  "58-Maj7": {
+    "sprite": "./audios/As3-Maj7.mp3",
+    "offset": 0,
+    "duration": 0
+  },
+  "58-Men": {
+    "sprite": "./audios/As3-Men.mp3",
+    "offset": 0,
+    "duration": 0
+  },
+  "58-Men7": {
+    "sprite": "./audios/As3-Men7.mp3",
+    "offset": 0,
+    "duration": 0
+  },
+  "58-m7b5": {
+    "sprite": "./audios/As3-m7b5.mp3",
+    "offset": 0,
+    "duration": 0
+  },
+  "59-Aug": {
+    "sprite": "./audios/B3-Aug.mp3",
+    "offset": 0,
+    "duration": 0
+  },
+  "59-AugM7": {
+    "sprite": "./audios/B3-AugM7.mp3",
+    "offset": 0,
+    "duration": 0
+  },
+  "59-Dim": {
+    "sprite": "./audios/B3-Dim.mp3",
+    "offset": 0,
+    "duration": 0
+  },
+  "59-Dim7": {
+    "sprite": "./audios/B3-Dim7.mp3",
+    "offset": 0,
+    "duration": 0
+  },
+  "59-Dom7": {
+    "sprite": "./audios/B3-Dom7.mp3",
+    "offset": 0,
+    "duration": 0
+  },
+  "59-Maj": {
+    "sprite": "./audios/B3-Maj.mp3",
+    "offset": 0,
+    "duration": 0
+  },
+  "59-Maj7": {
+    "sprite": "./audios/B3-Maj7.mp3",
+    "offset": 0,
+    "duration": 0
+  },
+  "59-Men": {
+    "sprite": "./audios/B3-Men.mp3",
+    "offset": 0,
+    "duration": 0
+  },
+  "59-Men7": {
+    "sprite": "./audios/B3-Men7.mp3",
+    "offset": 0,
+    "duration": 0
+  },
+  "59-m7b5": {
+    "sprite": "./audios/B3-m7b5.mp3",
+    "offset": 0,
+    "duration": 0
+  },
+  "48-Aug": {
+    "sprite": "./audios/C3-Aug.mp3",
+    "offset": 0,
+    "duration": 0
+  },
+  "48-AugM7": {
+    "sprite": "./audios/C3-AugM7.mp3",
+    "offset": 0,
+    "duration": 0
+  },
+  "48-Dim": {
+    "sprite": "./audios/C3-Dim.mp3",
+    "offset": 0,
+    "duration": 0
+  },
+  "48-Dim7": {
+    "sprite": "./audios/C3-Dim7.mp3",
+    "offset": 0,
+    "duration": 0
+  },
+  "48-Dom7": {
+    "sprite": "./audios/C3-Dom7.mp3",
+    "offset": 0,
+    "duration": 0
+  },
+  "48-Maj": {
+    "sprite": "./audios/C3-Maj.mp3",
+    "offset": 0,
+    "duration": 0
+  },
+  "48-Maj7": {
+    "sprite": "./audios/C3-Maj7.mp3",
+    "offset": 0,
+    "duration": 0
+  },
+  "48-Men": {
+    "sprite": "./audios/C3-Men.mp3",
+    "offset": 0,
+    "duration": 0
+  },
+  "48-Men7": {
+    "sprite": "./audios/C3-Men7.mp3",
+    "offset": 0,
+    "duration": 0
+  },
+  "48-m7b5": {
+    "sprite": "./audios/C3-m7b5.mp3",
+    "offset": 0,
+    "duration": 0
+  },
+  "49-Aug": {
+    "sprite": "./audios/Cs3-Aug.mp3",
+    "offset": 0,
+    "duration": 0
+  },
+  "49-AugM7": {
+    "sprite": "./audios/Cs3-AugM7.mp3",
+    "offset": 0,
+    "duration": 0
+  },
+  "49-Dim": {
+    "sprite": "./audios/Cs3-Dim.mp3",
+    "offset": 0,
+    "duration": 0
+  },
+  "49-Dim7": {
+    "sprite": "./audios/Cs3-Dim7.mp3",
+    "offset": 0,
+    "duration": 0
+  },
+  "49-Dom7": {
+    "sprite": "./audios/Cs3-Dom7.mp3",
+    "offset": 0,
+    "duration": 0
+  },
+  "49-Maj": {
+    "sprite": "./audios/Cs3-Maj.mp3",
+    "offset": 0,
+    "duration": 0
+  },
+  "49-Maj7": {
+    "sprite": "./audios/Cs3-Maj7.mp3",
+    "offset": 0,
+    "duration": 0
+  },
+  "49-Men": {
+    "sprite": "./audios/Cs3-Men.mp3",
+    "offset": 0,
+    "duration": 0
+  },
+  "49-Men7": {
+    "sprite": "./audios/Cs3-Men7.mp3",
+    "offset": 0,
+    "duration": 0
+  },
+  "49-m7b5": {
+    "sprite": "./audios/Cs3-m7b5.mp3",
+    "offset": 0,
+    "duration": 0
+  },
+  "50-Aug": {
+    "sprite": "./audios/D3-Aug.mp3",
+    "offset": 0,
+    "duration": 0
+  },
+  "50-AugM7": {
+    "sprite": "./audios/D3-AugM7.mp3",
+    "offset": 0,
+    "duration": 0
+  },
+  "50-Dim": {
+    "sprite": "./audios/D3-Dim.mp3",
+    "offset": 0,
+    "duration": 0
+  },
+  "50-Dim7": {
+    "sprite": "./audios/D3-Dim7.mp3",
+    "offset": 0,
+    "duration": 0
+  },
+  "50-Dom7": {
+    "sprite": "./audios/D3-Dom7.mp3",
+    "offset": 0,
+    "duration": 0
+  },
+  "50-Maj": {
+    "sprite": "./audios/D3-Maj.mp3",
+    "offset": 0,
+    "duration": 0
+  },
+  "50-Maj7": {
+    "sprite": "./audios/D3-Maj7.mp3",
+    "offset": 0,
+    "duration": 0
+  },
+  "50-Men": {
+    "sprite": "./audios/D3-Men.mp3",
+    "offset": 0,
+    "duration": 0
+  },
+  "50-Men7": {
+    "sprite": "./audios/D3-Men7.mp3",
+    "offset": 0,
+    "duration": 0
+  },
+  "50-m7b5": {
+    "sprite": "./audios/D3-m7b5.mp3",
+    "offset": 0,
+    "duration": 0
+  },
+  "51-Aug": {
+    "sprite": "./audios/Ds3-Aug.mp3",
+    "offset": 0,
+    "duration": 0
+  },
+  "51-AugM7": {
+    "sprite": "./audios/Ds3-AugM7.mp3",
+    "offset": 0,
+    "duration": 0
+  },
+  "51-Dim": {
+    "sprite": "./audios/Ds3-Dim.mp3",
+    "offset": 0,
+    "duration": 0
+  },
+  "51-Dim7": {
+    "sprite": "./audios/Ds3-Dim7.mp3",
+    "offset": 0,
+    "duration": 0
+  },
+  "51-Dom7": {
+    "sprite": "./audios/Ds3-Dom7.mp3",
+    "offset": 0,
+    "duration": 0
+  },
+  "51-Maj": {
+    "sprite": "./audios/Ds3-Maj.mp3",
+    "offset": 0,
+    "duration": 0
+  },
+  "51-Maj7": {
+    "sprite": "./audios/Ds3-Maj7.mp3",
+    "offset": 0,
+    "duration": 0
+  },
+  "51-Men": {
+    "sprite": "./audios/Ds3-Men.mp3",
+    "offset": 0,
+    "duration": 0
+  },
+  "51-Men7": {
+    "sprite": "./audios/Ds3-Men7.mp3",
+    "offset": 0,
+    "duration": 0
+  },
+  "51-m7b5": {
+    "sprite": "./audios/Ds3-m7b5.mp3",
+    "offset": 0,
+    "duration": 0
+  },
+  "52-Aug": {
+    "sprite": "./audios/E3-Aug.mp3",
+    "offset": 0,
+    "duration": 0
+  },
+  "52-AugM7": {
+    "sprite": "./audios/E3-AugM7.mp3",
+    "offset": 0,
+    "duration": 0
+  },
+  "52-Dim": {
+    "sprite": "./audios/E3-Dim.mp3",
+    "offset": 0,
+    "duration": 0
+  },
+  "52-Dim7": {
+    "sprite": "./audios/E3-Dim7.mp3",
+    "offset": 0,
+    "duration": 0
+  },
+  "52-Dom7": {
+    "sprite": "./audios/E3-Dom7.mp3",
+    "offset": 0,
+    "duration": 0
+  },
+  "52-Maj": {
+    "sprite": "./audios/E3-Maj.mp3",
+    "offset": 0,
+    "duration": 0
+  },
+  "52-Maj7": {
+    "sprite": "./audios/E3-Maj7.mp3",
+    "offset": 0,
+    "duration": 0
+  },
+  "52-Men": {
+    "sprite": "./audios/E3-Men.mp3",
+    "offset": 0,
+    "duration": 0
+  },
+  "52-Men7": {
+    "sprite": "./audios/E3-Men7.mp3",
+    "offset": 0,
+    "duration": 0
+  },
+  "52-m7b5": {
+    "sprite": "./audios/E3-m7b5.mp3",
+    "offset": 0,
+    "duration": 0
+  },
+  "53-Aug": {
+    "sprite": "./audios/F3-Aug.mp3",
+    "offset": 0,
+    "duration": 0
+  },
+  "53-AugM7": {
+    "sprite": "./audios/F3-AugM7.mp3",
+    "offset": 0,
+    "duration": 0
+  },
+  "53-Dim": {
+    "sprite": "./audios/F3-Dim.mp3",
+    "offset": 0,
+    "duration": 0
+  },
+  "53-Dim7": {
+    "sprite": "./audios/F3-Dim7.mp3",
+    "offset": 0,
+    "duration": 0
+  },
+  "53-Dom7": {
+    "sprite": "./audios/F3-Dom7.mp3",
+    "offset": 0,
+    "duration": 0
+  },
+  "53-Maj": {
+    "sprite": "./audios/F3-Maj.mp3",
+    "offset": 0,
+    "duration": 0
+  },
+  "53-Maj7": {
+    "sprite": "./audios/F3-Maj7.mp3",
+    "offset": 0,
+    "duration": 0
+  },
+  "53-Men": {
+    "sprite": "./audios/F3-Men.mp3",
+    "offset": 0,
+    "duration": 0
+  },
+  "53-Men7": {
+    "sprite": "./audios/F3-Men7.mp3",
+    "offset": 0,
+    "duration": 0
+  },
+  "53-m7b5": {
+    "sprite": "./audios/F3-m7b5.mp3",
+    "offset": 0,
+    "duration": 0
+  },
+  "54-Aug": {
+    "sprite": "./audios/Fs3-Aug.mp3",
+    "offset": 0,
+    "duration": 0
+  },
+  "54-AugM7": {
+    "sprite": "./audios/Fs3-AugM7.mp3",
+    "offset": 0,
+    "duration": 0
+  },
+  "54-Dim": {
+    "sprite": "./audios/Fs3-Dim.mp3",
+    "offset": 0,
+    "duration": 0
+  },
+  "54-Dim7": {
+    "sprite": "./audios/Fs3-Dim7.mp3",
+    "offset": 0,
+    "duration": 0
+  },
+  "54-Dom7": {
+    "sprite": "./audios/Fs3-Dom7.mp3",
+    "offset": 0,
+    "duration": 0
+  },
+  "54-Maj": {
+    "sprite": "./audios/Fs3-Maj.mp3",
+    "offset": 0,
+    "duration": 0
+  },
+  "54-Maj7": {
+    "sprite": "./audios/Fs3-Maj7.mp3",
+    "offset": 0,
+    "duration": 0
+  },
+  "54-Men": {
+    "sprite": "./audios/Fs3-Men.mp3",
+    "offset": 0,
+    "duration": 0
+  },
+  "54-Men7": {
+    "sprite": "./audios/Fs3-Men7.mp3",
+    "offset": 0,
+    "duration": 0
+  },
+  "54-m7b5": {
+    "sprite": "./audios/Fs3-m7b5.mp3",
+    "offset": 0,
+    "duration": 0
+  },
+  "55-Aug": {
+    "sprite": "./audios/G3-Aug.mp3",
+    "offset": 0,
+    "duration": 0
+  },
+  "55-AugM7": {
+    "sprite": "./audios/G3-AugM7.mp3",
+    "offset": 0,
+    "duration": 0
+  },
+  "55-Dim": {
+    "sprite": "./audios/G3-Dim.mp3",
+    "offset": 0,
+    "duration": 0
+  },
+  "55-Dim7": {
+    "sprite": "./audios/G3-Dim7.mp3",
+    "offset": 0,
+    "duration": 0
+  },
+  "55-Dom7": {
+    "sprite": "./audios/G3-Dom7.mp3",
+    "offset": 0,
+    "duration": 0
+  },
+  "55-Maj": {
+    "sprite": "./audios/G3-Maj.mp3",
+    "offset": 0,
+    "duration": 0
+  },
+  "55-Maj7": {
+    "sprite": "./audios/G3-Maj7.mp3",
+    "offset": 0,
+    "duration": 0
+  },
+  "55-Men": {
+    "sprite": "./audios/G3-Men.mp3",
+    "offset": 0,
+    "duration": 0
+  },
+  "55-Men7": {
+    "sprite": "./audios/G3-Men7.mp3",
+    "offset": 0,
+    "duration": 0
+  },
+  "55-m7b5": {
+    "sprite": "./audios/G3-m7b5.mp3",
+    "offset": 0,
+    "duration": 0
+  },
+  "56-Aug": {
+    "sprite": "./audios/Gs3-Aug.mp3",
+    "offset": 0,
+    "duration": 0
+  },
+  "56-AugM7": {
+    "sprite": "./audios/Gs3-AugM7.mp3",
+    "offset": 0,
+    "duration": 0
+  },
+  "56-Dim": {
+    "sprite": "./audios/Gs3-Dim.mp3",
+    "offset": 0,
+    "duration": 0
+  },
+  "56-Dim7": {
+    "sprite": "./audios/Gs3-Dim7.mp3",
+    "offset": 0,
+    "duration": 0
+  },
+  "56-Dom7": {
+    "sprite": "./audios/Gs3-Dom7.mp3",
+    "offset": 0,
+    "duration": 0
+  },
+  "56-Maj": {
+    "sprite": "./audios/Gs3-Maj.mp3",
+    "offset": 0,
+    "duration": 0
+  },
+  "56-Maj7": {
+    "sprite": "./audios/Gs3-Maj7.mp3",
+    "offset": 0,
+    "duration": 0
+  },
+  "56-Men": {
+    "sprite": "./audios/Gs3-Men.mp3",
+    "offset": 0,
+    "duration": 0
+  },
+  "56-Men7": {
+    "sprite": "./audios/Gs3-Men7.mp3",
+    "offset": 0,
+    "duration": 0
+  },
+  "56-m7b5": {
+    "sprite": "./audios/Gs3-m7b5.mp3",
+    "offset": 0,
+    "duration": 0
+  }
 }

@@ -1,0 +1,6 @@
+{
+  "dependencies": {
+    "minimist": "^1.2.8",
+    "music-metadata": "^11.9.0"
+  }
+}

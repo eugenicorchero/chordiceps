@@ -312,6 +312,7 @@
                 this.spriteBuffers = new Map(); // spriteUrl -> AudioBuffer
                 this.bufferCache = new Map(); // key -> AudioBuffer for individual files (mobile optimized)
                 this.useSprites = false;
+                this.usePerFileMap = false;
             }
 
             fileKey(midi, chord) { return `${midi}-${chord}`; }
@@ -559,9 +560,44 @@
                     if (this.bufferCache && this.bufferCache.has && this.bufferCache.has(key)) return Promise.resolve({ key, buffer: this.bufferCache.get(key), ok: true });
                     return Promise.resolve(this.cache.get(key));
                 }
-                // If sprites are available and mapping contains the key, try to ensure sprite buffer is loaded and return a placeholder object
+                // If sprites are available and mapping contains the key
                 if (this.useSprites && this.spriteMap && this.spriteMap[key]) {
-                    const spriteUrl = this.spriteMap[key].sprite;
+                    const entry = this.spriteMap[key];
+                    // If the map is a per-file map (each entry points to its own file), load that file directly and return it
+                    if (this.usePerFileMap) {
+                        const url = entry.sprite;
+                        const keyLocal = key;
+                        const p = new Promise((resolve) => {
+                            if (isMobile && audioCtx) {
+                                fetch(url).then(r => { if (!r.ok) throw new Error('fetch failed'); return r.arrayBuffer(); }).then(ab => {
+                                    return new Promise((resDecode, rejDecode) => {
+                                        audioCtx.decodeAudioData(ab, decoded => resDecode(decoded), err => rejDecode(err));
+                                    });
+                                }).then(decodedBuffer => {
+                                    this.bufferCache.set(keyLocal, decodedBuffer);
+                                    this.cache.set(keyLocal, { __buffer: true });
+                                    this.promote(keyLocal);
+                                    this.ensureCacheLimit();
+                                    resolve({ key: keyLocal, buffer: decodedBuffer, ok: true, url });
+                                }).catch(() => {
+                                    const audio = new Audio(url);
+                                    audio.preload = 'auto';
+                                    audio.oncanplaythrough = () => { this.cache.set(keyLocal, audio); resolve({ key: keyLocal, audio, ok: true, url }); };
+                                    audio.onerror = () => { resolve({ key: keyLocal, audio: null, ok: false, url }); };
+                                    try { audio.load(); } catch (e) { resolve({ key: keyLocal, audio: null, ok: false, url }); }
+                                });
+                            } else {
+                                const audio = new Audio(url);
+                                audio.preload = 'auto';
+                                audio.oncanplaythrough = () => { this.cache.set(keyLocal, audio); resolve({ key: keyLocal, audio, ok: true, url }); };
+                                audio.onerror = () => { resolve({ key: keyLocal, audio: null, ok: false, url }); };
+                                try { audio.load(); } catch (e) { resolve({ key: keyLocal, audio: null, ok: false, url }); }
+                            }
+                        });
+                        return p;
+                    }
+                    // Otherwise treat the entry as a combined sprite and ensure its buffer is loaded
+                    const spriteUrl = entry.sprite;
                     return this.loadSprite(spriteUrl).then(() => Promise.reject(new Error('sprite')));
                     // Note: when using sprites, playback uses playFromSprite(), not HTMLAudioElement returned here.
                 }
@@ -591,6 +627,14 @@
                 return fetch(url).then(r => { if (!r.ok) throw new Error('map fetch failed'); return r.json(); }).then(json => {
                     this.spriteMap = json;
                     this.useSprites = true;
+                    // detect per-file map: entries point to individual files under /audios/ or not pointing to sprites
+                    try {
+                        const entries = Object.values(json || {});
+                        const looksLikePerFile = entries.length > 0 && entries.every(e => typeof e.sprite === 'string' && (e.sprite.includes('/audios/') || !e.sprite.includes('sprites/')));
+                        this.usePerFileMap = !!looksLikePerFile;
+                    } catch (e) {
+                        this.usePerFileMap = false;
+                    }
                     return json;
                 });
             }
@@ -650,9 +694,24 @@
             if (!midi || !chord) return;
 
             try {
-                    // If sprites available and mapping exists, play from sprite buffer
+                    // Ensure audio context unlocked (mobile) before playing buffers
+                    await ensureAudioUnlocked();
+
                     const key = `${midi}-${chord}`;
-                    if (audioLoader.useSprites && audioLoader.spriteMap && audioLoader.spriteMap[key]) {
+
+                    // If sprites are used and the map is a per-file map, prefer loading that file directly
+                    if (audioLoader.useSprites && audioLoader.usePerFileMap && audioLoader.spriteMap && audioLoader.spriteMap[key]) {
+                        try {
+                            const loaded = await audioLoader.getAudio(midi, chord);
+                            if (loaded && loaded.buffer) { await audioLoader.playBuffer(key); return; }
+                            if (loaded && loaded instanceof HTMLAudioElement) { try { loaded.pause(); loaded.currentTime = 0; loaded.play().catch(()=>{}); return; } catch(e) {} }
+                        } catch (e) {
+                            console.warn('Per-file map playback failed, falling back to other methods', e);
+                        }
+                    }
+
+                    // If sprites available and mapping exists for combined sprite, try to play from sprite buffer first
+                    if (audioLoader.useSprites && !audioLoader.usePerFileMap && audioLoader.spriteMap && audioLoader.spriteMap[key]) {
                         try {
                             await audioLoader.playFromSprite(key);
                             return;
@@ -660,9 +719,6 @@
                             console.warn('Sprite playback failed, falling back to file', e);
                         }
                     }
-
-                    // Ensure audio context unlocked (mobile) before playing buffers
-                    await ensureAudioUnlocked();
 
                     const loaded = await audioLoader.getAudio(midi, chord);
                     // If loader returned a buffer, play via WebAudio buffer path
