@@ -1017,27 +1017,7 @@
             } catch(e) { return null; }
         }
 
-        async function retryFailedUrls() {
-            const arr = Array.from(audioLoader.failedUrls || []);
-            if (!arr.length) { alert('No failed URLs to retry'); return; }
-            elements.preloaderStatus.textContent = `Reintentant ${arr.length} fitxers...`;
-            // Attempt sequentially with small delay
-            for (let i=0;i<arr.length;i++) {
-                const url = arr[i];
-                const parts = parseUrlToParts(url);
-                if (!parts) continue;
-                try {
-                    await audioLoader.getAudio(parts.midi, parts.chord);
-                    // remove from failed set
-                    audioLoader.failedUrls.delete(url);
-                } catch(e) {
-                    // keep in failed set
-                }
-                await new Promise(r => setTimeout(r, 300));
-            }
-            localStorage.setItem('chordiceps_failed_urls', JSON.stringify(Array.from(audioLoader.failedUrls || [])));
-            alert('Reintents finalitzats. Errors restants: ' + (audioLoader.failedUrls.size || 0));
-        }
+        // Removed retryFailedUrls function as requested.
     </script>
 
 
