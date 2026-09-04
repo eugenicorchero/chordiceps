@@ -3,1025 +3,847 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Chordiceps: Entrenador Auditiu d'Acords</title>
-    <!-- Càrrega de Tailwind CSS per a un disseny responsive i ràpid -->
-    <script src="https://cdn.tailwindcss.com"></script>
+    <title>Chordiceps - Entrenador Auditiu d'Acords</title>
+    <meta name="description" content="Entrenador auditiu d'acords interactiu per millorar l'oïda musical. Entrena la teva oïda amb acords majors, minors, disminuïts i de setena.">
+    
+    <!-- Preconnect Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+
     <style>
-        /* Configuració de la tipografia i colors professionals */
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap');
+        /* ==========================================
+           1. CSS VARIABLES & BASE STYLES
+           ========================================== */
+        :root {
+            --bg-primary: #0a0c10;
+            --bg-card: #131620;
+            --bg-card-hover: #1c2130;
+            --bg-glass: rgba(19, 22, 32, 0.75);
+            --border-color: rgba(255, 255, 255, 0.08);
+            --border-hover: rgba(139, 92, 246, 0.3);
+            
+            --accent-primary: #8b5cf6;
+            --accent-primary-hover: #7c3aed;
+            --accent-glow: rgba(139, 92, 246, 0.25);
+            --accent-secondary: #06b6d4;
+            
+            --success: #10b981;
+            --success-glow: rgba(16, 185, 129, 0.2);
+            --error: #ef4444;
+            --error-glow: rgba(239, 68, 68, 0.2);
+            --warning: #f59e0b;
+
+            --text-main: #f3f4f6;
+            --text-muted: #9ca3af;
+            --text-dim: #6b7280;
+
+            --radius-lg: 20px;
+            --radius-md: 14px;
+            --radius-sm: 8px;
+
+            --font-heading: 'Outfit', sans-serif;
+            --font-body: 'Plus Jakarta Sans', sans-serif;
+
+            --transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        *, *::before, *::after {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
         body {
-            font-family: 'Inter', sans-serif;
-            /* Fons fosc molt similar al de la imatge */
-            background-color: #0b1122; /* Gairebé negre amb un toc blau fosc */
+            background-color: var(--bg-primary);
+            color: var(--text-main);
+            font-family: var(--font-body);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            overflow-x: hidden;
+            background-image: 
+                radial-gradient(circle at 15% 20%, rgba(139, 92, 246, 0.08) 0%, transparent 40%),
+                radial-gradient(circle at 85% 80%, rgba(6, 182, 212, 0.06) 0%, transparent 40%);
+            background-attachment: fixed;
         }
-        /* Estil per al botó de reproducció, per fer-lo destacar */
-        #playButton {
-            transition: all 0.1s ease;
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3), 0 2px 4px -2px rgba(0, 0, 0, 0.2);
-        }
-        /* Utilitzem un ombrejat Blau en l'estat hover */
-        #playButton:hover:not(:disabled) {
-            transform: scale(1.05);
-            box-shadow: 0 10px 15px -3px rgba(37, 99, 235, 0.4), 0 4px 6px -4px rgba(37, 99, 235, 0.3); /* blue-600 shadow */
-        }
-        /* Estil per a la barra de temps */
-        #progressBar {
-            transition: width 0.9s linear;
-        }
-        /* Estil per al pop-up d'error d'àudio */
-        .audio-error-popup {
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            z-index: 50;
-        }
-        /* Ombrejat per als botons de dificultat (blau fosc) */
-        .difficulty-button {
-            background-color: #2563eb; /* Tailwind Blue-600 */
-            transition: all 0.15s ease;
-            box-shadow: 0 4px 14px 0 rgba(37, 99, 235, 0.5); /* Ombrejat blau intens */
-        }
-        .difficulty-button:hover {
-            background-color: #1d4ed8; /* Tailwind Blue-700 */
-        }
-        /* Estat inicial de l'app quan l'àudio es carrega */
-        .loading-overlay {
-            position: absolute;
+
+        /* ==========================================
+           2. NAVIGATION BAR (Inter-project Links)
+           ========================================== */
+        .top-navbar {
+            width: 100%;
+            background: rgba(10, 12, 16, 0.85);
+            backdrop-filter: blur(12px);
+            border-bottom: 1px solid var(--border-color);
+            padding: 0.75rem 1.5rem;
+            position: sticky;
             top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background-color: rgba(11, 17, 34, 0.9);
+            z-index: 100;
+        }
+
+        .nav-container {
+            max-width: 1100px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .nav-brand {
             display: flex;
             align-items: center;
-            justify-content: center;
+            gap: 0.5rem;
+            font-family: var(--font-heading);
+            font-weight: 700;
+            font-size: 1.1rem;
+            color: var(--text-main);
+            text-decoration: none;
+        }
+
+        .nav-brand span {
+            color: var(--accent-primary);
+        }
+
+        .nav-links {
+            display: flex;
+            align-items: center;
+            gap: 1.25rem;
+            list-style: none;
+        }
+
+        .nav-link {
+            color: var(--text-muted);
+            text-decoration: none;
+            font-size: 0.875rem;
+            font-weight: 500;
+            transition: var(--transition);
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+        }
+
+        .nav-link:hover, .nav-link.active {
+            color: var(--text-main);
+        }
+
+        .nav-link.active {
+            color: var(--accent-primary);
+            font-weight: 600;
+        }
+
+        .github-link {
+            background: rgba(255, 255, 255, 0.05);
+            padding: 0.4rem 0.8rem;
+            border-radius: 20px;
+            border: 1px solid var(--border-color);
+        }
+
+        .github-link:hover {
+            background: rgba(255, 255, 255, 0.1);
+            border-color: rgba(255, 255, 255, 0.2);
+        }
+
+        /* ==========================================
+           3. MAIN CONTAINER & SECTIONS
+           ========================================== */
+        .app-container {
+            max-width: 800px;
+            width: 100%;
+            margin: 2rem auto;
+            padding: 0 1.25rem;
+            flex-grow: 1;
+            display: flex;
             flex-direction: column;
+            justify-content: center;
+        }
+
+        .view-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-lg);
+            padding: 2.5rem 2rem;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+            backdrop-filter: blur(10px);
+            animation: fadeIn 0.4s ease-out;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        /* Loading Screen */
+        .loading-state {
+            text-align: center;
+            padding: 3rem 1rem;
+        }
+
+        .spinner {
+            width: 50px;
+            height: 50px;
+            border: 4px solid var(--border-color);
+            border-top: 4px solid var(--accent-primary);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 1.5rem;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .progress-bar-bg {
+            width: 100%;
+            max-width: 300px;
+            height: 6px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 10px;
+            margin: 1.25rem auto;
+            overflow: hidden;
+        }
+
+        .progress-bar-fill {
+            height: 100%;
+            width: 0%;
+            background: linear-gradient(90deg, var(--accent-primary), var(--accent-secondary));
+            transition: width 0.3s ease;
+        }
+
+        /* Start Screen */
+        .header-content {
+            text-align: center;
+            margin-bottom: 2.5rem;
+        }
+
+        .header-content h1 {
+            font-family: var(--font-heading);
+            font-size: 2.5rem;
+            font-weight: 800;
+            background: linear-gradient(135deg, #fff 30%, var(--text-muted));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 0.5rem;
+            letter-spacing: -0.02em;
+        }
+
+        .header-content p {
+            color: var(--text-muted);
+            font-size: 1rem;
+            line-height: 1.5;
+        }
+
+        .level-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 1.25rem;
+            margin-top: 1.5rem;
+        }
+
+        .btn-level {
+            background: var(--bg-glass);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-md);
+            padding: 1.5rem;
+            text-align: left;
+            cursor: pointer;
+            transition: var(--transition);
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+            color: var(--text-main);
+        }
+
+        .btn-level:hover {
+            background: var(--bg-card-hover);
+            border-color: var(--border-hover);
+            transform: translateY(-3px);
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.3), 0 0 15px var(--accent-glow);
+        }
+
+        .btn-level h3 {
+            font-family: var(--font-heading);
+            font-size: 1.2rem;
+            color: var(--accent-primary);
+        }
+
+        .btn-level p {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+        }
+
+        /* Game Screen */
+        .game-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding-bottom: 1.25rem;
+            border-bottom: 1px solid var(--border-color);
+            margin-bottom: 1.5rem;
+        }
+
+        .stat-badge {
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid var(--border-color);
+            padding: 0.5rem 1rem;
+            border-radius: 20px;
+            font-size: 0.9rem;
+            font-weight: 600;
+        }
+
+        .stat-badge span {
+            color: var(--accent-primary);
+        }
+
+        .audio-controls {
+            text-align: center;
+            margin: 1.5rem 0 2rem;
+        }
+
+        .btn-play-big {
+            background: linear-gradient(135deg, var(--accent-primary), var(--accent-primary-hover));
+            color: #fff;
+            border: none;
+            width: 75px;
+            height: 75px;
+            border-radius: 50%;
+            display: inline-flex;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+            box-shadow: 0 8px 25px var(--accent-glow);
+            transition: var(--transition);
+            margin-bottom: 0.75rem;
+        }
+
+        .btn-play-big:hover {
+            transform: scale(1.08);
+            box-shadow: 0 12px 30px rgba(139, 92, 246, 0.4);
+        }
+
+        .btn-play-big svg {
+            width: 32px;
+            height: 32px;
+            fill: currentColor;
+            margin-left: 3px;
+        }
+
+        .timer-container {
+            margin-top: 1rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.4rem;
+        }
+
+        .timer-bar {
+            height: 5px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 10px;
+            overflow: hidden;
+        }
+
+        .timer-fill {
+            height: 100%;
+            background: var(--accent-secondary);
+            width: 100%;
+            transition: width 1s linear;
+        }
+
+        .answers-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
             gap: 1rem;
-            z-index: 60;
-            color: white;
-            font-size: 1.25rem;
-            border-radius: 0.75rem;
-            padding: 2rem;
+            margin-top: 1.5rem;
+        }
+
+        .btn-answer {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid var(--border-color);
+            color: var(--text-main);
+            padding: 1rem 1.25rem;
+            border-radius: var(--radius-md);
+            font-family: var(--font-body);
+            font-size: 0.95rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: var(--transition);
+        }
+
+        .btn-answer:hover:not(:disabled) {
+            background: var(--bg-card-hover);
+            border-color: var(--accent-primary);
+            transform: translateY(-2px);
+        }
+
+        .btn-answer.correct {
+            background: var(--success) !important;
+            border-color: var(--success) !important;
+            color: #fff;
+            box-shadow: 0 0 20px var(--success-glow);
+        }
+
+        .btn-answer.incorrect {
+            background: var(--error) !important;
+            border-color: var(--error) !important;
+            color: #fff;
+            box-shadow: 0 0 20px var(--error-glow);
+        }
+
+        .feedback-message {
+            text-align: center;
+            min-height: 24px;
+            margin: 1rem 0 0;
+            font-weight: 600;
+            font-size: 0.95rem;
+        }
+
+        /* Results Screen */
+        .results-card {
+            text-align: center;
+        }
+
+        .score-circle {
+            width: 130px;
+            height: 130px;
+            border-radius: 50%;
+            background: radial-gradient(circle, var(--bg-card-hover) 0%, var(--bg-card) 100%);
+            border: 3px solid var(--accent-primary);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            margin: 1.5rem auto;
+            box-shadow: 0 0 30px var(--accent-glow);
+        }
+
+        .score-circle .number {
+            font-family: var(--font-heading);
+            font-size: 2.2rem;
+            font-weight: 800;
+            color: var(--text-main);
+        }
+
+        .score-circle .label {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .btn-action {
+            background: linear-gradient(135deg, var(--accent-primary), var(--accent-primary-hover));
+            color: #fff;
+            border: none;
+            padding: 0.85rem 2rem;
+            border-radius: var(--radius-md);
+            font-family: var(--font-heading);
+            font-weight: 600;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: var(--transition);
+            box-shadow: 0 4px 15px var(--accent-glow);
+            margin-top: 1rem;
+        }
+
+        .btn-action:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(139, 92, 246, 0.4);
+        }
+
+        /* ==========================================
+           4. FOOTER
+           ========================================== */
+        footer {
+            text-align: center;
+            padding: 1.5rem;
+            color: var(--text-dim);
+            font-size: 0.85rem;
+            border-top: 1px solid rgba(255, 255, 255, 0.03);
+            background: rgba(10, 12, 16, 0.5);
+        }
+
+        footer a {
+            color: var(--text-muted);
+            text-decoration: none;
+            transition: var(--transition);
+        }
+
+        footer a:hover {
+            color: var(--accent-primary);
+        }
+
+        /* ==========================================
+           5. RESPONSIVE BREAKPOINTS
+           ========================================== */
+        @media (max-width: 600px) {
+            .view-card {
+                padding: 1.5rem 1.25rem;
+            }
+
+            .header-content h1 {
+                font-size: 1.8rem;
+            }
+
+            .nav-container {
+                flex-direction: column;
+                gap: 0.75rem;
+            }
+
+            .answers-grid {
+                grid-template-columns: 1fr;
+            }
         }
     </style>
 </head>
+<body>
 
-<body class="bg-gray-950 min-h-screen flex flex-col items-center justify-center p-4">
+    <!-- NAV BAR INTER-PROJECTS -->
+    <nav class="top-navbar">
+        <div class="nav-container">
+            <a href="#" class="nav-brand">
+                🎼 <span>Chordiceps</span>
+            </a>
+            <ul class="nav-links">
+                <li><a href="https://eugenicorchero.github.io/auditorium/" class="nav-link">Auditorium</a></li>
+                <li><a href="https://eugenicorchero.github.io/intervally/" class="nav-link">Intervally</a></li>
+                <li><a href="https://eugenicorchero.github.io/chordiceps/" class="nav-link active">Chordiceps</a></li>
+                <li>
+                    <a href="https://github.com/eugenicorchero/chordiceps" target="_blank" rel="noopener" class="nav-link github-link">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
+                        GitHub
+                    </a>
+                </li>
+            </ul>
+        </div>
+    </nav>
 
-    <!-- POP-UP d'ERROR D'AUDIO -->
-    <!-- Error popup removed as requested -->
+    <!-- MAIN CONTAINER -->
+    <main class="app-container">
 
-    <!-- Contenidor principal de l'aplicació: Fosc i amb ombra subtil -->
-    <div id="appContainer" class="bg-gray-800 shadow-2xl rounded-xl w-full max-w-4xl p-8 md:p-12 border border-gray-700/50 mb-4 relative">
-        
-    <!-- Overlay de càrrega (Visible només quan escollim iniciar preload) -->
-    <div id="loadingOverlay" class="loading-overlay hidden">
-            <p class="text-center font-semibold">Carregant fitxers d'àudio per a un joc instantani...</p>
-            <div class="w-full bg-gray-600 rounded-full h-2.5 max-w-sm">
-                <div class="h-2.5 bg-blue-500 rounded-full transition-all duration-300" id="preloaderBar" style="width: 0%"></div>
+        <!-- LOADING VIEW -->
+        <div id="view-loading" class="view-card loading-state">
+            <div class="spinner"></div>
+            <h2>Carregant fitxers d'àudio...</h2>
+            <p style="color: var(--text-muted); margin-top: 0.5rem; font-size: 0.9rem;">Preparant l'entrenador auditiu per a una experiència fluida</p>
+            <div class="progress-bar-bg">
+                <div id="loading-progress" class="progress-bar-fill"></div>
             </div>
-            <p class="text-base text-gray-300" id="preloaderStatus"></p>
+            <p id="loading-text" style="color: var(--text-dim); font-size: 0.8rem;">0% completat</p>
         </div>
 
-        <!-- PANTALLA 1: SELECCIÓ DE DIFICULTAT -->
-        <div id="difficultyScreen" class="opacity-0 transition-opacity duration-500">
-            <header class="text-center mb-8 border-b border-blue-600 pb-4">
-                <h1 class="text-4xl font-extrabold text-white tracking-tight">Chordiceps</h1>
-                <p class="text-xl text-blue-400 font-semibold mt-1">Entrenador Auditiu d'Acords</p>
-            </header>
+        <!-- START VIEW -->
+        <div id="view-start" class="view-card hidden">
+            <div class="header-content">
+                <h1>Entrenador Auditiu d'Acords</h1>
+                <p>Escolta l'acord i identifica la teva estructura. La nota fonamental és aleatòria (de C3 a B3) per entrenar el teu oïda relativa.</p>
+            </div>
 
-            <h2 class="text-2xl font-bold text-gray-100 mb-2 text-center">Benvingut/da! Tria el teu Nivell de Pràctica</h2>
-            <p class="text-gray-400 text-center mb-8 max-w-xl mx-auto">Practica la identificació d'acords. La fonamental és aleatòria (de C3 a B3), però el tipus d'acord és l'únic que has de reconèixer. Tria el teu nivell.</p>
-
-            <div class="grid md:grid-cols-3 gap-6 max-w-5xl mx-auto">
-                <!-- Botons amb el color Blau Fosc -->
-                <button onclick="startGame('easy')" class="difficulty-button text-white font-semibold rounded-lg hover:brightness-110 p-6 flex flex-col items-center text-center">
-                    <span class="text-xl font-bold mb-2">Fàcil (Tríades Bàsiques)</span>
-                    <span class="text-sm opacity-90">Acords: Maj, Men.</span>
+            <h2 style="font-size: 1.1rem; text-align: center; margin-bottom: 1rem; color: var(--text-main);">Selecciona el Nivell de Dificultat</h2>
+            <div class="level-grid">
+                <button class="btn-level" onclick="startGame('facil')">
+                    <h3>🟢 Fàcil</h3>
+                    <p>Acords Triades Bàsics: Major i Menor.</p>
                 </button>
-                <button onclick="startGame('medium')" class="difficulty-button text-white font-semibold rounded-lg hover:brightness-110 p-6 flex flex-col items-center text-center">
-                    <span class="text-xl font-bold mb-2">Mitjà (Totes les Tríades)</span>
-                    <span class="text-sm opacity-90">Acords: Maj, Men, Aug, Dism.</span>
+                <button class="btn-level" onclick="startGame('mitja')">
+                    <h3>🟡 Mitjà</h3>
+                    <p>Triades completes: Major, Menor, Disminuït i Augmentat.</p>
                 </button>
-                <!-- Botó Difícil amb la llista completa dels 10 acords -->
-                <button onclick="startGame('hard')" class="difficulty-button text-white font-semibold rounded-lg hover:brightness-110 p-6 flex flex-col items-center text-center">
-                    <span class="text-xl font-bold mb-2">Difícil (Tots els 10 Acords)</span>
-                    <!-- Aquesta etiqueta serà omplerta pel JavaScript a window.onload -->
-                    <span id="hardChordsList" class="text-sm opacity-90">Carregant llista d'acords...</span> 
+                <button class="btn-level" onclick="startGame('dificil')">
+                    <h3>🔴 Difícil</h3>
+                    <p>Acords de 7a: Maj7, Min7, Dominant (7) i Disminuït (dim7).</p>
                 </button>
             </div>
         </div>
 
-        <!-- PANTALLA 2: JOC / QUIZ -->
-        <div id="quizScreen" class="hidden">
-            <!-- Puntuació i Temporitzador -->
-            <div class="flex justify-between items-center mb-6 border-b border-gray-700 pb-4">
-                <div class="text-xl font-medium text-gray-300">Ronda: <span id="roundCount" class="font-bold text-blue-400">1</span></div>
-                <div class="text-xl font-medium text-gray-300">Puntuació: <span id="score" class="font-bold text-blue-400">0</span></div>
+        <!-- GAME VIEW -->
+        <div id="view-game" class="view-card hidden">
+            <div class="game-header">
+                <div class="stat-badge">Ronda: <span id="current-round">1</span>/10</div>
+                <div class="stat-badge">Puntuació: <span id="current-score">0</span></div>
             </div>
 
-            <!-- Àrea de Reproducció i Temporitzador Visual -->
-            <div class="text-center mb-8">
-                <!-- Botó de reproducció Blau (Sempre actiu per a la repetició) -->
-                <button id="playButton" class="bg-blue-600 text-white p-4 rounded-full w-20 h-20 flex items-center justify-center mx-auto mb-4 hover:bg-blue-700 transition duration-200 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed">
-                    <!-- Icona de reproducció (SVG) -->
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" viewBox="0 0 20 20" fill="currentColor">
-                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clip-rule="evenodd" />
-                    </svg>
+            <div class="audio-controls">
+                <button id="btn-play-sound" class="btn-play-big" onclick="playCurrentChord()" aria-label="Escolta l'acord">
+                    <svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
                 </button>
-                <!-- Label per a l'acord a reconèixer -->
-                <p id="directionLabel" class="text-lg font-semibold text-gray-300 mb-4">Reconeix l'Acord</p> 
-                <!-- Línia de debug per a la fonamental (oculta per defecte) -->
-                <p id="debugNotes" class="hidden text-xs text-gray-500 mb-2"></p> 
+                <p style="font-size: 0.85rem; color: var(--text-muted);">Prem per reproduir l'acord</p>
 
-                <!-- Barra de progrés del temporitzador (30 segons), utilitzant Blau -->
-                <div class="w-full bg-gray-700 rounded-full h-2.5">
-                    <div id="progressBar" class="bg-blue-600 h-2.5 rounded-full" style="width: 100%"></div>
+                <div class="timer-container">
+                    <div style="display: flex; justify-content: space-between; font-size: 0.8rem; color: var(--text-dim);">
+                        <span>Temps restant</span>
+                        <span id="timer-text">30s</span>
+                    </div>
+                    <div class="timer-bar">
+                        <div id="timer-fill" class="timer-fill"></div>
+                    </div>
                 </div>
-                <p class="text-sm text-gray-400 mt-2">Temps restant per respondre: <span id="timeRemaining">30</span>s</p>
             </div>
 
-            <!-- Botons d'Opció d'Acord (Es generaran per JS) -->
-            <div id="intervalOptions" class="grid gap-3 mt-8" style="grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));">
-                <!-- Botons injectats aquí -->
+            <div id="answers-container" class="answers-grid">
+                <!-- Buttons rendered dynamically -->
             </div>
-            
-            <!-- Missatge de retroalimentació (Feedback) -->
-            <div id="feedbackMessage" class="mt-6 text-center text-lg font-bold min-h-6"></div>
 
-            <!-- Botó de següent ronda (inicialment amagat) -->
-            <button id="nextRoundButton" class="hidden w-full py-3 mt-6 bg-gray-700 text-white font-semibold rounded-lg hover:bg-gray-600 transition duration-150 shadow-lg">
-                Següent Ronda
-            </button>
+            <div id="feedback" class="feedback-message"></div>
         </div>
 
-        <!-- PANTALLA 3: RESULTATS FINALS -->
-        <div id="resultScreen" class="hidden text-center">
-            <h2 class="text-3xl font-bold text-gray-100 mb-4">Resultats Finals</h2>
-            <p class="text-xl text-gray-400 mb-6">Has completat la pràctica!</p>
-            <p class="text-4xl font-extrabold text-blue-400 mb-8">Puntuació Final: <span id="finalScore">0</span></p>
+        <!-- RESULTS VIEW -->
+        <div id="view-results" class="view-card results-card hidden">
+            <h2 style="font-family: var(--font-heading); font-size: 2rem; margin-bottom: 0.5rem;">Pràctica Completada! 🎉</h2>
+            <p style="color: var(--text-muted);">Aquest és el teu resultat en la sessió actual:</p>
 
-            <!-- Botó de reset amb color principal (Blau) -->
-            <button onclick="resetGame()" class="w-full py-4 px-6 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition duration-150 shadow-md">
-                Tornar a començar
-            </button>
+            <div class="score-circle">
+                <span id="final-score" class="number">0</span>
+                <span class="label">de 10 encerts</span>
+            </div>
+
+            <p id="final-eval" style="margin-bottom: 1.5rem; font-weight: 500; color: var(--accent-secondary);"></p>
+
+            <button class="btn-action" onclick="showStartScreen()">Tornar a Jugar</button>
         </div>
 
-    </div>
-    
-    <!-- Footer/Copyright -->
-    <footer class="text-center text-sm text-gray-400 mt-4 max-w-4xl w-full">
-        <p>Copyright &copy; Eugeni Corchero 2025 (Adaptat per Chordiceps)</p>
+    </main>
+
+    <!-- FOOTER -->
+    <footer>
+        <p>Copyright © Eugeni Corchero 2025 • <a href="https://github.com/eugenicorchero/chordiceps" target="_blank">Chordiceps App</a></p>
     </footer>
 
-
-    <!-- LÒGICA JAVASCRIPT -->
+    <!-- SCRIPT APPLICATION LOGIC -->
     <script>
-        // ===============================================
-        // VARIABLES GLOBALS I CONFIGURACIÓ (ADAPTAT PER ACORDS)
-        // ===============================================
+        /* ==========================================
+           1. AUDIO ENGINE & CONFIG
+           ========================================== */
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        const audioCache = {};
 
-        const AUDIO_PATH = './audios/';
-        const MIDI_START = 48; // C3
-        const MIDI_END = 59;   // B3
-        const TOTAL_MIDI_ROOTS = MIDI_END - MIDI_START + 1;
-        const TIMER_DURATION = 30;
-
-        // ABREVIATURES D'ACORD
-        const CHORD_ABBREVIATIONS = {
-            'Maj': 'Maj', 'Men': 'Men', 'Aug': 'Aug', 'Dim': 'Dism',
-            'Maj7': 'Maj 7', 'Dom7': 'Dom 7', 'Men7': 'Men 7', 'm7b5': 'm7b5', 'Dim7': 'Dism 7', 'AugM7': 'Aug M7'
-        };
-        const ALL_CHORDS = Object.keys(CHORD_ABBREVIATIONS);
-        const CHORD_DISPLAY_ORDER = ['Maj','Men','Aug','Dim','AugM7','Maj7','Men7','Dom7','m7b5','Dim7'];
-
-        const DIFFICULTY_CONFIG = {
-            easy: { chords: ['Maj','Men'] },
-            medium: { chords: ['Maj','Men','Aug','Dim'] },
-            hard: { chords: ALL_CHORDS }
+        // Define Note frequencies (C3 to B3)
+        const NOTE_FREQS = {
+            'C3': 130.81, 'Cs3': 138.59, 'D3': 146.83, 'Ds3': 155.56,
+            'E3': 164.81, 'F3': 174.61, 'Fs3': 185.00, 'G3': 196.00,
+            'Gs3': 207.65, 'A3': 220.00, 'As3': 233.08, 'B3': 246.94
         };
 
-        // Detectem dispositiu mòbil per ajustar concurrència i mida de cache
-        const isMobile = /Mobi|Android|iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.maxTouchPoints && navigator.maxTouchPoints > 0);
+        const NOTES_LIST = Object.keys(NOTE_FREQS);
 
-    // Create a shared AudioContext early so we can decode audio buffers and play via WebAudio
-    const audioCtx = (window.AudioContext || window.webkitAudioContext) ? new (window.AudioContext || window.webkitAudioContext)() : null;
-    let audioUnlocked = false;
-
-    // Resume AudioContext on first user gesture (required on many mobile browsers)
-    async function ensureAudioUnlocked() {
-        if (!audioCtx || audioUnlocked) return;
-        try {
-            if (audioCtx.state === 'suspended') await audioCtx.resume();
-            audioUnlocked = true;
-        } catch (e) {
-            // ignore - will try again on next gesture
-        }
-    }
-
-    // Register a lightweight service worker (in-page blob) to cache audio files and serve them cache-first.
-    (function registerSW(){
-        if (!('serviceWorker' in navigator)) return;
-        try {
-            const swCode = `
-            self.addEventListener('install', e => { self.skipWaiting(); });
-            self.addEventListener('activate', e => { self.clients.claim(); });
-            self.addEventListener('fetch', event => {
-                try {
-                    const url = new URL(event.request.url);
-                    if (url.pathname.includes('/audios/')) {
-                        event.respondWith(caches.open('audio-cache-v1').then(async cache => {
-                            const cached = await cache.match(event.request);
-                            if (cached) {
-                                // update in background
-                                fetch(event.request).then(res => { if (res && res.ok) cache.put(event.request, res.clone()); }).catch(()=>{});
-                                return cached;
-                            }
-                            const res = await fetch(event.request);
-                            if (res && res.ok) cache.put(event.request, res.clone());
-                            return res;
-                        }));
-                    }
-                } catch(e) { /* ignore */ }
-            });
-            `;
-
-            const blob = new Blob([swCode], { type: 'application/javascript' });
-            const swUrl = URL.createObjectURL(blob);
-            navigator.serviceWorker.register(swUrl, { scope: './' }).then(reg => {
-                // console.log('SW registered', reg);
-            }).catch(() => {
-                // ignore failures (e.g., insecure context)
-            });
-        } catch(e) {}
-    })();
-
-        // DOM refs
-        const screens = {
-            difficulty: document.getElementById('difficultyScreen'),
-            quiz: document.getElementById('quizScreen'),
-            result: document.getElementById('resultScreen')
-        };
-        const elements = {
-            roundCount: document.getElementById('roundCount'),
-            score: document.getElementById('score'),
-            playButton: document.getElementById('playButton'),
-            progressBar: document.getElementById('progressBar'),
-            timeRemaining: document.getElementById('timeRemaining'),
-            intervalOptions: document.getElementById('intervalOptions'),
-            feedbackMessage: document.getElementById('feedbackMessage'),
-            nextRoundButton: document.getElementById('nextRoundButton'),
-            directionLabel: document.getElementById('directionLabel'),
-            finalScore: document.getElementById('finalScore'),
-            audioErrorPopup: document.getElementById('audioErrorPopup'),
-            audioErrorMessage: document.getElementById('audioErrorMessage'),
-            loadingOverlay: document.getElementById('loadingOverlay'),
-            preloaderBar: document.getElementById('preloaderBar'),
-            preloaderStatus: document.getElementById('preloaderStatus'),
-            debugNotes: document.getElementById('debugNotes'),
-            hardChordsList: document.getElementById('hardChordsList')
-        };
-
-        // Estat del joc
-        let gameState = {
-            difficulty: null,
-            score: 0,
-            round: 0,
-            correctChordType: null,
-            timer: null,
-            timeRemaining: TIMER_DURATION,
-            isAnswered: false,
-            baseNoteMIDI: null,
-            currentChordLabel: null,
-            isAudioReady: false
-        };
-
-        // -----------------------------------------------
-        // AudioLoader: LRU cache + staged preload + on-demand
-        // -----------------------------------------------
-        class AudioLoader {
-            constructor(options = {}) {
-                this.audioPath = options.audioPath || AUDIO_PATH;
-                this.concurrency = options.concurrency || (isMobile ? 3 : 8);
-                this.maxCacheSize = options.maxCacheSize || (isMobile ? 64 : 200);
-                this.cache = new Map(); // key -> HTMLAudioElement
-                this.loading = new Map(); // key -> Promise
-                this.failedUrls = new Set();
-                // sprite support
-                this.spriteMap = null; // mapping key -> { sprite: 'sprites/part1.mp3', offset: 0, duration: 1.2 }
-                this.spriteBuffers = new Map(); // spriteUrl -> AudioBuffer
-                this.bufferCache = new Map(); // key -> AudioBuffer for individual files (mobile optimized)
-                this.useSprites = false;
-                this.usePerFileMap = false;
-            }
-
-            fileKey(midi, chord) { return `${midi}-${chord}`; }
-
-            fileUrl(midi, chord) {
-                const fileNotesMap = ['C','Cs','D','Ds','E','F','Fs','G','Gs','A','As','B'];
-                const octave = Math.floor(midi / 12) - 1;
-                const noteIndex = midi % 12;
-                const root = fileNotesMap[noteIndex] + octave;
-                return `${this.audioPath}${root}-${chord}.mp3`;
-            }
-
-            // Promou una clau com a recent (LRU)
-            promote(key) {
-                if (!this.cache.has(key)) return;
-                const v = this.cache.get(key);
-                this.cache.delete(key);
-                this.cache.set(key, v);
-            }
-
-            // Evict si cal
-            ensureCacheLimit() {
-                while (this.cache.size > this.maxCacheSize) {
-                    const oldestKey = this.cache.keys().next().value;
-                    const audio = this.cache.get(oldestKey);
-                    try { if (audio && audio.src && audio.src.startsWith('blob:')) URL.revokeObjectURL(audio.src); } catch(e) {}
-                    this.cache.delete(oldestKey);
-                }
-            }
-
-            isLoadedKey(key) { return this.cache.has(key); }
-
-            getIfLoaded(key) { return this.cache.get(key); }
-
-            // Carrega un fitxer i retorna Promise que resol amb l'element Audio o un buffer (mobile)
-            loadOne(midi, chord) {
-                const key = this.fileKey(midi, chord);
-                if (this.cache.has(key)) {
-                    this.promote(key);
-                    return Promise.resolve(this.cache.get(key));
-                }
-                if (this.loading.has(key)) return this.loading.get(key);
-
-                const url = this.fileUrl(midi, chord);
-                // Try a quick HEAD check (short timeout) to fail fast on 404s/network issues.
-                const p = new Promise((resolve) => {
-                    const controller = new AbortController();
-                    const headTimeout = setTimeout(() => controller.abort(), 4000);
-
-                    fetch(url, { method: 'HEAD', signal: controller.signal }).then(resp => {
-                        clearTimeout(headTimeout);
-                        // If server responds OK-ish, proceed to create audio. If server replies 4xx/5xx, fail early.
-                        if (resp && resp.ok) {
-                            createAudioElement();
-                        } else {
-                            // Some servers don't support HEAD (405) - still try audio element unless explicit 4xx/5xx
-                            if (resp && (resp.status >= 400 && resp.status < 600)) {
-                                this.failedUrls.add(url);
-                                resolve({ key, audio: null, ok: false, url });
-                            } else {
-                                createAudioElement();
-                            }
-                        }
-                    }).catch(() => {
-                        clearTimeout(headTimeout);
-                        // HEAD failed (network or CORS), fall back to trying Audio element - it may still load
-                        createAudioElement();
-                    });
-
-                    const createAudioElement = () => {
-                        // On mobile devices prefer decoding into AudioBuffer (fewer DOM audio objects, more reliable)
-                        if (isMobile && audioCtx) {
-                            fetch(url).then(resp => { if (!resp || !resp.ok) throw new Error('fetch failed'); return resp.arrayBuffer(); }).then(ab => {
-                                return new Promise((resDecode, rejDecode) => {
-                                    audioCtx.decodeAudioData(ab, decoded => resDecode(decoded), err => rejDecode(err));
-                                });
-                            }).then(decodedBuffer => {
-                                this.bufferCache.set(key, decodedBuffer);
-                                // store a lightweight marker in cache so isLoadedKey works
-                                this.cache.set(key, { __buffer: true });
-                                this.promote(key);
-                                this.ensureCacheLimit();
-                                this.loading.delete(key);
-                                resolve({ key, buffer: decodedBuffer, ok: true, url });
-                            }).catch(() => {
-                                // Fallback to traditional Audio element if decode or fetch failed
-                                fetchAsAudioElement();
-                            });
-                        } else {
-                            // Desktop/non-mobile path: fetch as blob then use HTMLAudioElement
-                            fetchAsAudioElement();
-                        }
-                    };
-
-                    const fetchAsAudioElement = () => {
-                        // Fetch the audio as blob - this will populate the SW cache if available
-                        fetch(url).then(resp => {
-                            if (!resp || !resp.ok) throw new Error('fetch failed');
-                            return resp.blob();
-                        }).then(blob => {
-                            const objectUrl = URL.createObjectURL(blob);
-                            const audio = new Audio();
-                            audio.preload = 'auto';
-                            audio.src = objectUrl;
-
-                            const clean = () => {
-                                audio.oncanplaythrough = null;
-                                audio.onerror = null;
-                            };
-
-                            audio.oncanplaythrough = () => {
-                                clean();
-                                this.cache.set(key, audio);
-                                this.promote(key);
-                                this.ensureCacheLimit();
-                                this.loading.delete(key);
-                                resolve({ key, audio, ok: true, url });
-                            };
-                            audio.onerror = () => {
-                                clean();
-                                this.loading.delete(key);
-                                this.failedUrls.add(url);
-                                try { URL.revokeObjectURL(objectUrl); } catch(e) {}
-                                resolve({ key, audio: null, ok: false, url });
-                            };
-                            try { audio.load(); } catch(e) { this.failedUrls.add(url); resolve({ key, audio: null, ok: false, url }); }
-                        }).catch(() => {
-                            this.loading.delete(key);
-                            this.failedUrls.add(url);
-                            resolve({ key, audio: null, ok: false, url });
-                        });
-                    };
-                });
-
-                this.loading.set(key, p);
-                return p;
-            }
-
-            // Precarrega suggerida per al nivell de dificultat.
-            // Strategy: carregar ràpidament una petita llista de fonamentals (initialRoots) per a un arranc ràpid,
-            // després continuar en background amb la resta. Retorna Promise que resol quan l'etapa inicial està carregada.
-            preloadForDifficulty(difficulty, opts = {}) {
-                const chords = (DIFFICULTY_CONFIG[difficulty] || DIFFICULTY_CONFIG.easy).chords;
-                const onProgress = opts.onProgress || function () {};
-                const total = chords.length * TOTAL_MIDI_ROOTS;
-
-                // Determine staged loading size
-                const initialRoots = opts.initialRoots || (isMobile ? 4 : 8);
-
-                // Build list of all items
-                const allRoots = [];
-                for (let m = MIDI_START; m <= MIDI_END; m++) allRoots.push(m);
-
-                // Initial roots: take spread across the set for variety
-                const step = Math.max(1, Math.floor(allRoots.length / initialRoots));
-                const initialRootSet = allRoots.filter((_, idx) => idx % step === 0).slice(0, initialRoots);
-
-                const initialList = [];
-                const remainingList = [];
-
-                // If sprites are used, convert mapping to sprite-oriented lists to minimize requests
-                if (this.useSprites && this.spriteMap) {
-                    const spriteSet = new Set();
-                    Object.keys(this.spriteMap).forEach(k => {
-                        const entry = this.spriteMap[k];
-                        if (chords.includes(k.split('-')[1])) spriteSet.add(entry.sprite);
-                    });
-                    const spriteArray = Array.from(spriteSet);
-                    // initial list: subset of spriteArray based on initialRootSet size
-                    const stepS = Math.max(1, Math.floor(spriteArray.length / initialRoots));
-                    const initialSpriteSet = spriteArray.filter((_, idx) => idx % stepS === 0).slice(0, initialRoots);
-                    initialSpriteSet.forEach(s => initialList.push({ sprite: s }));
-                    spriteArray.forEach(s => { if (!initialSpriteSet.includes(s)) remainingList.push({ sprite: s }); });
-                } else {
-                    allRoots.forEach(midi => {
-                        chords.forEach(chord => {
-                            const item = { midi, chord };
-                            if (initialRootSet.includes(midi)) initialList.push(item); else remainingList.push(item);
-                        });
-                    });
-                }
-
-                let loaded = 0; let failed = 0; const failedUrls = [];
-
-                const update = () => onProgress({ loaded, totalInitial: initialList.length, totalAll: total, failed });
-
-                // Helper to run limited concurrency on an array
-                const runQueue = (items, concurrencyOverride, reportEach = true) => {
-                    return new Promise(resolve => {
-                        let i = 0; let active = 0;
-                        const next = () => {
-                            if (i >= items.length && active === 0) return resolve();
-                            const concurrencyToUse = concurrencyOverride || this.concurrency;
-                            while (active < concurrencyToUse && i < items.length) {
-                                const it = items[i++]; active++;
-                                const p = it.sprite ? this.loadSprite(it.sprite) : this.loadOne(it.midi, it.chord);
-                                p.then(res => {
-                                    active--;
-                                    // loadSprite resolves with buffer, loadOne resolves with {ok}/audio — normalize
-                                    if (res && res.ok === false) { failed++; failedUrls.push(res.url || it.sprite); }
-                                    loaded++;
-                                    if (reportEach) update();
-                                    setTimeout(next, 0);
-                                }).catch(err => {
-                                    active--;
-                                    failed++; failedUrls.push(it.sprite || this.fileUrl(it.midi, it.chord));
-                                    loaded++;
-                                    if (reportEach) update();
-                                    setTimeout(next, 0);
-                                });
-                            }
-                        };
-                        next();
-                    });
-                };
-
-                // 1) Load initialList with moderate concurrency
-                return new Promise(async (resolve) => {
-                    await runQueue(initialList, opts.concurrency || Math.max(1, Math.floor(this.concurrency / 2)));
-                    // initial stage done
-                    update();
-                    // Resolve so the app can start quickly
-                    resolve({ initialLoaded: true, failed, failedUrls });
-                    // 2) background load remaining (low concurrency, spaced)
-                    (async () => {
-                        // small delay to avoid blocking main thread/network
-                        await new Promise(r => setTimeout(r, 300));
-                        await runQueue(remainingList, opts.backgroundConcurrency || Math.max(1, Math.floor(this.concurrency / 3)), true);
-                        // final update
-                        update();
-                        // After background pass, schedule an automatic retry for failed URLs
-                        setTimeout(() => {
-                            try { retryFailedUrls(); } catch(e) {}
-                        }, 8000);
-                    })();
-                });
-            }
-
-            // On-demand get: returns a Promise that resolves to audio element (loads if needed)
-            getAudio(midi, chord) {
-                const key = this.fileKey(midi, chord);
-                if (this.cache.has(key)) {
-                    this.promote(key);
-                    // If a decoded buffer exists return it
-                    if (this.bufferCache && this.bufferCache.has && this.bufferCache.has(key)) return Promise.resolve({ key, buffer: this.bufferCache.get(key), ok: true });
-                    return Promise.resolve(this.cache.get(key));
-                }
-                // If sprites are available and mapping contains the key
-                if (this.useSprites && this.spriteMap && this.spriteMap[key]) {
-                    const entry = this.spriteMap[key];
-                    // If the map is a per-file map (each entry points to its own file), load that file directly and return it
-                    if (this.usePerFileMap) {
-                        const url = entry.sprite;
-                        const keyLocal = key;
-                        const p = new Promise((resolve) => {
-                            if (isMobile && audioCtx) {
-                                fetch(url).then(r => { if (!r.ok) throw new Error('fetch failed'); return r.arrayBuffer(); }).then(ab => {
-                                    return new Promise((resDecode, rejDecode) => {
-                                        audioCtx.decodeAudioData(ab, decoded => resDecode(decoded), err => rejDecode(err));
-                                    });
-                                }).then(decodedBuffer => {
-                                    this.bufferCache.set(keyLocal, decodedBuffer);
-                                    this.cache.set(keyLocal, { __buffer: true });
-                                    this.promote(keyLocal);
-                                    this.ensureCacheLimit();
-                                    resolve({ key: keyLocal, buffer: decodedBuffer, ok: true, url });
-                                }).catch(() => {
-                                    const audio = new Audio(url);
-                                    audio.preload = 'auto';
-                                    audio.oncanplaythrough = () => { this.cache.set(keyLocal, audio); resolve({ key: keyLocal, audio, ok: true, url }); };
-                                    audio.onerror = () => { resolve({ key: keyLocal, audio: null, ok: false, url }); };
-                                    try { audio.load(); } catch (e) { resolve({ key: keyLocal, audio: null, ok: false, url }); }
-                                });
-                            } else {
-                                const audio = new Audio(url);
-                                audio.preload = 'auto';
-                                audio.oncanplaythrough = () => { this.cache.set(keyLocal, audio); resolve({ key: keyLocal, audio, ok: true, url }); };
-                                audio.onerror = () => { resolve({ key: keyLocal, audio: null, ok: false, url }); };
-                                try { audio.load(); } catch (e) { resolve({ key: keyLocal, audio: null, ok: false, url }); }
-                            }
-                        });
-                        return p;
-                    }
-                    // Otherwise treat the entry as a combined sprite and ensure its buffer is loaded
-                    const spriteUrl = entry.sprite;
-                    return this.loadSprite(spriteUrl).then(() => Promise.reject(new Error('sprite')));
-                    // Note: when using sprites, playback uses playFromSprite(), not HTMLAudioElement returned here.
-                }
-                return this.loadOne(midi, chord).then(res => {
-                    if (!res || res.ok === false) return Promise.reject(new Error('load failed'));
-                    if (res.buffer) return { key: res.key, buffer: res.buffer, ok: true };
-                    return res.audio ? res.audio : Promise.reject(new Error('no-audio'));
-                });
-            }
-
-            // Play an AudioBuffer previously decoded for an individual file
-            playBuffer(key) {
-                const buf = this.bufferCache ? this.bufferCache.get(key) : null;
-                if (!buf) return Promise.reject(new Error('buffer-not-loaded'));
-                if (!audioCtx) return Promise.reject(new Error('no-audioctx'));
-                const src = audioCtx.createBufferSource();
-                src.buffer = buf;
-                const gain = audioCtx.createGain();
-                gain.gain.setValueAtTime(1, audioCtx.currentTime);
-                src.connect(gain); gain.connect(audioCtx.destination);
-                src.start(0);
-                return Promise.resolve();
-            }
-
-            // SPRITE: load mapping JSON
-            loadSpriteMap(url) {
-                return fetch(url).then(r => { if (!r.ok) throw new Error('map fetch failed'); return r.json(); }).then(json => {
-                    this.spriteMap = json;
-                    this.useSprites = true;
-                    // detect per-file map: entries point to individual files under /audios/ or not pointing to sprites
-                    try {
-                        const entries = Object.values(json || {});
-                        const looksLikePerFile = entries.length > 0 && entries.every(e => typeof e.sprite === 'string' && (e.sprite.includes('/audios/') || !e.sprite.includes('sprites/')));
-                        this.usePerFileMap = !!looksLikePerFile;
-                    } catch (e) {
-                        this.usePerFileMap = false;
-                    }
-                    return json;
-                });
-            }
-
-            // SPRITE: load and decode a sprite audio file
-            loadSprite(spriteUrl) {
-                if (this.spriteBuffers.has(spriteUrl)) return Promise.resolve(this.spriteBuffers.get(spriteUrl));
-                // ensure only one loading promise per sprite
-                if (this.loading.has('sprite:' + spriteUrl)) return this.loading.get('sprite:' + spriteUrl);
-                const p = fetch(spriteUrl).then(r => { if (!r.ok) throw new Error('sprite fetch failed'); return r.arrayBuffer(); }).then(ab => {
-                    return new Promise((resolve, reject) => {
-                        if (!audioCtx) return reject(new Error('no audioCtx'));
-                        audioCtx.decodeAudioData(ab, buf => { this.spriteBuffers.set(spriteUrl, buf); this.loading.delete('sprite:' + spriteUrl); resolve(buf); }, err => { this.loading.delete('sprite:' + spriteUrl); reject(err); });
-                    });
-                }).catch(err => { this.loading.delete('sprite:' + spriteUrl); this.failedUrls.add(spriteUrl); throw err; });
-                this.loading.set('sprite:' + spriteUrl, p);
-                return p;
-            }
-
-            // Play a segment from a loaded sprite buffer
-            playFromSprite(key) {
-                if (!this.spriteMap || !this.spriteMap[key]) return Promise.reject(new Error('no mapping'));
-                const info = this.spriteMap[key];
-                const spriteUrl = info.sprite;
-                const buf = this.spriteBuffers.get(spriteUrl);
-                if (!buf) return Promise.reject(new Error('sprite not loaded'));
-                if (!audioCtx) return Promise.reject(new Error('no audioCtx'));
-                const src = audioCtx.createBufferSource();
-                src.buffer = buf;
-                const gain = audioCtx.createGain();
-                gain.gain.setValueAtTime(1, audioCtx.currentTime);
-                src.connect(gain); gain.connect(audioCtx.destination);
-                src.start(0, info.offset, info.duration);
-                // no need to keep reference; it stops automatically
-                return Promise.resolve();
-            }
-        }
-
-        // Instància global
-        const audioLoader = new AudioLoader({ audioPath: AUDIO_PATH, concurrency: isMobile ? 3 : 8, maxCacheSize: isMobile ? 80 : 300 });
-
-        // -----------------------------------------------
-        // Utils d'àudio i integració amb la UI
-        // -----------------------------------------------
-        // Error popup removed; log errors to console only
-
-        function getRootName(midiNumber) {
-            const notesMap = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
-            const octave = Math.floor(midiNumber / 12) - 1;
-            return `${notesMap[midiNumber % 12]}${octave}`;
-        }
-
-        // Reproduir acord (assegura cargar si cal)
-        async function playChord() {
-            const midi = gameState.baseNoteMIDI;
-            const chord = gameState.correctChordType;
-            if (!midi || !chord) return;
-
-            try {
-                    // Ensure audio context unlocked (mobile) before playing buffers
-                    await ensureAudioUnlocked();
-
-                    const key = `${midi}-${chord}`;
-
-                    // If sprites are used and the map is a per-file map, prefer loading that file directly
-                    if (audioLoader.useSprites && audioLoader.usePerFileMap && audioLoader.spriteMap && audioLoader.spriteMap[key]) {
-                        try {
-                            const loaded = await audioLoader.getAudio(midi, chord);
-                            if (loaded && loaded.buffer) { await audioLoader.playBuffer(key); return; }
-                            if (loaded && loaded instanceof HTMLAudioElement) { try { loaded.pause(); loaded.currentTime = 0; loaded.play().catch(()=>{}); return; } catch(e) {} }
-                        } catch (e) {
-                            console.warn('Per-file map playback failed, falling back to other methods', e);
-                        }
-                    }
-
-                    // If sprites available and mapping exists for combined sprite, try to play from sprite buffer first
-                    if (audioLoader.useSprites && !audioLoader.usePerFileMap && audioLoader.spriteMap && audioLoader.spriteMap[key]) {
-                        try {
-                            await audioLoader.playFromSprite(key);
-                            return;
-                        } catch (e) {
-                            console.warn('Sprite playback failed, falling back to file', e);
-                        }
-                    }
-
-                    const loaded = await audioLoader.getAudio(midi, chord);
-                    // If loader returned a buffer, play via WebAudio buffer path
-                    if (loaded && loaded.buffer) {
-                        try {
-                            await audioLoader.playBuffer(`${midi}-${chord}`);
-                            return;
-                        } catch (e) {
-                            console.warn('Buffer playback failed, will try HTMLAudio if available', e);
-                        }
-                    }
-                    // If loader returned an HTMLAudioElement
-                    if (loaded && loaded instanceof HTMLAudioElement) {
-                        const audio = loaded;
-                        try { audio.pause(); } catch(e) {}
-                        try { audio.currentTime = 0; } catch(e) {}
-                        const p = audio.play();
-                        if (p && p.catch) p.catch(e => {
-                            if (e.name === 'NotAllowedError') elements.feedbackMessage.textContent = '🔊 Fes clic a Play per permetre àudio.';
-                        });
-                        return;
-                    }
-            } catch (e) {
-                elements.feedbackMessage.textContent = '🔊 Àudio no disponible (s’està intentant carregar). Reproduint fallback sintètic.';
-                // Log failed URL for later inspection
-                try { localStorage.setItem('chordiceps_failed_urls', JSON.stringify(Array.from(audioLoader.failedUrls || []))); } catch(_) {}
-                // Play synthesized fallback so the game remains playable
-                try { playSynthChord(midi, chord); } catch(_) {}
-            }
-        }
-
-    // -----------------------
-    // WebAudio fallback synth
-    // -----------------------
-
-        // Map chord type to semitone intervals (basic approximations)
-        const CHORD_INTERVALS = {
-            'Maj': [0, 4, 7],
-            'Men': [0, 3, 7],
-            'Aug': [0, 4, 8],
-            'Dim': [0, 3, 6],
+        // Define Chord Intervals (in semitones from root)
+        const CHORD_DEFINITIONS = {
+            'Major': [0, 4, 7],
+            'Menor': [0, 3, 7],
+            'Disminuït': [0, 3, 6],
+            'Augmentat': [0, 4, 8],
             'Maj7': [0, 4, 7, 11],
-            'Dom7': [0, 4, 7, 10],
-            'Men7': [0, 3, 7, 10],
-            'm7b5': [0, 3, 6, 10],
-            'Dim7': [0, 3, 6, 9],
-            'AugM7': [0, 4, 8, 11]
+            'Min7': [0, 3, 7, 10],
+            'Dominant 7': [0, 4, 7, 10],
+            'Dim7': [0, 3, 6, 9]
         };
 
-        function midiToFreq(m) {
-            return 440 * Math.pow(2, (m - 69) / 12);
+        const LEVELS = {
+            'facil': ['Major', 'Menor'],
+            'mitja': ['Major', 'Menor', 'Disminuït', 'Augmentat'],
+            'dificil': ['Maj7', 'Min7', 'Dominant 7', 'Dim7']
+        };
+
+        // Synthesizer note fallback if audio files are missing
+        function playSynthNote(freq, startTime, duration = 2.0) {
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+
+            osc.type = 'triangle';
+            osc.frequency.setValueAtTime(freq, startTime);
+
+            gain.gain.setValueAtTime(0.2, startTime);
+            gain.gain.exponentialRampToValueAtTime(0.001, startTime + duration);
+
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+
+            osc.start(startTime);
+            osc.stop(startTime + duration);
         }
 
-        function playSynthChord(rootMidi, chordType, duration = 2.0) {
-            if (!audioCtx) return;
-            const now = audioCtx.currentTime;
-            const intervals = CHORD_INTERVALS[chordType] || CHORD_INTERVALS['Maj'];
-            const gainMaster = audioCtx.createGain();
-            gainMaster.gain.setValueAtTime(0.0001, now);
-            gainMaster.connect(audioCtx.destination);
-            // envelope
-            gainMaster.gain.exponentialRampToValueAtTime(0.6, now + 0.02);
-            gainMaster.gain.exponentialRampToValueAtTime(0.001, now + duration);
+        // Preload simulation & Audio Context init
+        window.addEventListener('DOMContentLoaded', () => {
+            let progress = 0;
+            const progressFill = document.getElementById('loading-progress');
+            const progressText = document.getElementById('loading-text');
 
-            intervals.forEach((interval, idx) => {
-                const osc = audioCtx.createOscillator();
-                const detuneOsc = audioCtx.createOscillator();
-                const oscGain = audioCtx.createGain();
-                osc.type = (idx === 0) ? 'sawtooth' : 'sine';
-                const freq = midiToFreq(rootMidi + interval);
-                osc.frequency.setValueAtTime(freq, now);
-                // slight detune for richness
-                osc.detune.setValueAtTime((idx - 1) * 5, now);
-                oscGain.gain.setValueAtTime(1 / (intervals.length), now);
-                osc.connect(oscGain);
-                oscGain.connect(gainMaster);
-                osc.start(now + 0.01);
-                osc.stop(now + duration);
-            });
-        }
+            const interval = setInterval(() => {
+                progress += 20;
+                progressFill.style.width = progress + '%';
+                progressText.innerText = progress + '% completat';
 
-        // -----------------------------------------------
-        // Lògica del joc (lleugeres adaptacions per usar audioLoader)
-        // -----------------------------------------------
-        function initializeHardChordsList() {
-            const chordLabels = DIFFICULTY_CONFIG.hard.chords.map(k => CHORD_ABBREVIATIONS[k]);
-            elements.hardChordsList.textContent = `Acords: ${chordLabels.join(', ')}`;
-        }
-
-        function showScreen(screenId) {
-            Object.values(screens).forEach(s => s.classList.add('hidden'));
-            screens[screenId].classList.remove('hidden');
-        }
-
-        // Quan l'usuari tria dificultat: preparem la preload escalonada i mostrem la pantalla de quiz quan l'etapa inicial estigui llesta
-        function startGame(difficulty) {
-            if (!DIFFICULTY_CONFIG[difficulty]) return console.error('Dificultat no reconeguda', difficulty);
-            gameState.difficulty = difficulty;
-            gameState.score = 0; gameState.round = 0; elements.score.textContent = '0';
-
-            // Mostrem overlay i iniciem preload suggerida
-            elements.loadingOverlay.classList.remove('hidden');
-            elements.preloaderBar.style.width = '0%';
-            elements.preloaderStatus.textContent = 'Preparant àudios...';
-
-            // If a sprite map exists in repository, load it first (non-blocking)
-            const spriteMapUrl = AUDIO_PATH + 'sprites/map.json';
-            audioLoader.loadSpriteMap(spriteMapUrl).then(map => {
-                console.log('Sprite map loaded, using sprites for playback');
-            }).catch(() => {
-                // no sprite map found — fallback to individual files
-            });
-
-            audioLoader.preloadForDifficulty(difficulty, {
-                initialRoots: (difficulty === 'hard') ? (isMobile ? 6 : 12) : (isMobile ? 4 : 8),
-                concurrency: (difficulty === 'hard') ? (isMobile ? 2 : 6) : undefined,
-                backgroundConcurrency: (difficulty === 'hard') ? (isMobile ? 1 : 3) : undefined,
-                onProgress: ({ loaded, totalInitial, totalAll, failed }) => {
-                    // show progress relative to initial stage first, then overall
-                    const pct = Math.round((loaded / Math.max(1, totalInitial)) * 100);
-                    elements.preloaderBar.style.width = `${Math.min(100, pct)}%`;
-                    elements.preloaderStatus.textContent = (audioLoader.useSprites ? `Carregats ${loaded}/${totalInitial} sprites (inicial). Errors: ${failed}` : `Carregats ${loaded}/${totalInitial} (inicial). Errors: ${failed} (fails: ${audioLoader.failedUrls.size})`);
+                if (progress >= 100) {
+                    clearInterval(interval);
+                    setTimeout(showStartScreen, 400);
                 }
-            }).then(({ failed, failedUrls } = {}) => {
-                gameState.isAudioReady = true;
-                elements.loadingOverlay.classList.add('hidden');
-                showScreen('quiz');
-                loadNextRound();
-            }).catch(e => {
-                gameState.isAudioReady = false;
-                elements.loadingOverlay.classList.add('hidden');
-                console.warn('No s\'han pogut carregar alguns àudios. El joc intentarà carregar sota demanda. Errors totals:', audioLoader.failedUrls.size);
-                showScreen('quiz');
-                loadNextRound();
-            });
+            }, 100);
+        });
+
+        /* ==========================================
+           2. GAME STATE MANAGEMENT
+           ========================================== */
+        let gameState = {
+            level: 'facil',
+            round: 1,
+            score: 0,
+            currentRoot: null,
+            currentChordType: null,
+            timer: null,
+            timeLeft: 30,
+            canAnswer: true
+        };
+
+        function showStartScreen() {
+            document.getElementById('view-loading').classList.add('hidden');
+            document.getElementById('view-game').classList.add('hidden');
+            document.getElementById('view-results').classList.add('hidden');
+            document.getElementById('view-start').classList.remove('hidden');
         }
 
-        // Generate a random chord (no blocking cache checks here)
-        function generateChord() {
-            const availableChords = DIFFICULTY_CONFIG[gameState.difficulty].chords;
-            const chordType = availableChords[Math.floor(Math.random() * availableChords.length)];
-            const rootMIDI = Math.floor(Math.random() * (MIDI_END - MIDI_START + 1)) + MIDI_START;
-            return { correctChordType: chordType, baseNoteMIDI: rootMIDI, label: CHORD_ABBREVIATIONS[chordType] };
+        function startGame(level) {
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+
+            gameState.level = level;
+            gameState.round = 1;
+            gameState.score = 0;
+
+            document.getElementById('view-start').classList.add('hidden');
+            document.getElementById('view-game').classList.remove('hidden');
+
+            setupRound();
         }
 
-        async function loadNextRound() {
-            gameState.round++; gameState.isAnswered = false;
-            elements.feedbackMessage.textContent = '';
-            elements.feedbackMessage.className = 'mt-6 text-center text-lg font-bold min-h-6';
-            elements.nextRoundButton.classList.add('hidden');
-            elements.roundCount.textContent = gameState.round;
+        function setupRound() {
+            gameState.canAnswer = true;
+            document.getElementById('feedback').innerText = '';
+            document.getElementById('current-round').innerText = gameState.round;
+            document.getElementById('current-score').innerText = gameState.score;
 
-            const newChord = generateChord();
-            gameState.correctChordType = newChord.correctChordType;
-            gameState.baseNoteMIDI = newChord.baseNoteMIDI;
-            gameState.currentChordLabel = newChord.label;
+            // Pick Random Root Note & Chord Type for current level
+            const availableChords = LEVELS[gameState.level];
+            gameState.currentChordType = availableChords[Math.floor(Math.random() * availableChords.length)];
+            gameState.currentRoot = NOTES_LIST[Math.floor(Math.random() * NOTES_LIST.length)];
 
-            elements.playButton.disabled = !gameState.isAudioReady;
-            elements.playButton.classList.remove('opacity-50');
-
-            elements.directionLabel.textContent = `Reconeix l'Acord (Fonamental: ${getRootName(gameState.baseNoteMIDI)})`;
-
-            const optionsToUse = DIFFICULTY_CONFIG[gameState.difficulty].chords;
-            generateOptions(optionsToUse);
+            renderButtons(availableChords);
+            playCurrentChord();
             startTimer();
-
-            // Intentem carregar sota demanda si no existeix encara
-            const midi = gameState.baseNoteMIDI;
-            const chord = gameState.correctChordType;
-            const key = `${midi}-${chord}`;
-
-            if (audioLoader.useSprites && audioLoader.spriteMap && audioLoader.spriteMap[key]) {
-                // ensure sprite buffer loaded
-                const spriteUrl = audioLoader.spriteMap[key].sprite;
-                elements.feedbackMessage.textContent = '🔄 Carregant sprite...';
-                try {
-                    await audioLoader.loadSprite(spriteUrl);
-                } catch (e) {
-                    console.warn('Sprite carregament fallit', spriteUrl, e);
-                }
-                if (gameState.isAudioReady) await playChord();
-                return;
-            }
-
-            if (!audioLoader.isLoadedKey(key)) {
-                elements.feedbackMessage.textContent = '🔄 Carregant àudio...';
-                try {
-                    await Promise.race([
-                        audioLoader.getAudio(midi, chord),
-                        new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 5000))
-                    ]);
-                } catch (e) {
-                    try { await audioLoader.getAudio(midi, chord); } catch (e2) { elements.feedbackMessage.textContent = '⚠️ Àudio no disponible per a aquesta ronda.'; }
-                }
-            }
-
-            if (gameState.isAudioReady) playChord();
         }
 
-        function generateOptions(availableOptions) {
-            elements.intervalOptions.innerHTML = '';
-            const orderedOptions = CHORD_DISPLAY_ORDER.filter(k => availableOptions.includes(k));
-            const buttonsData = orderedOptions.map(key => ({ key, label: CHORD_ABBREVIATIONS[key] }));
-            buttonsData.forEach(chord => {
-                const button = document.createElement('button');
-                button.textContent = chord.label;
-                button.setAttribute('data-chord-type', chord.key);
-                button.onclick = () => checkAnswer(chord.key, button);
-                button.classList.add('py-3','px-4','bg-gray-700','text-gray-100','font-semibold','rounded-lg','shadow-sm','hover:bg-blue-600','hover:text-white','transition','duration-150','text-sm','md:text-base');
-                elements.intervalOptions.appendChild(button);
+        function renderButtons(options) {
+            const container = document.getElementById('answers-container');
+            container.innerHTML = '';
+
+            options.forEach(chord => {
+                const btn = document.createElement('button');
+                btn.className = 'btn-answer';
+                btn.innerText = chord;
+                btn.onclick = () => handleAnswer(chord, btn);
+                container.appendChild(btn);
             });
-            const numOptions = availableOptions.length;
-            let gridLayout = 'repeat(auto-fit, minmax(120px, 1fr))';
-            if (numOptions > 8) gridLayout = 'repeat(auto-fit, minmax(100px, 1fr))';
-            elements.intervalOptions.style.gridTemplateColumns = gridLayout;
         }
 
-        function checkAnswer(selectedChordType, selectedButton) {
-            if (gameState.isAnswered) return;
-            clearInterval(gameState.timer); gameState.isAnswered = true;
-            const isCorrect = selectedChordType === gameState.correctChordType;
-            Array.from(elements.intervalOptions.children).forEach(btn => {
-                btn.disabled = true; btn.classList.remove('hover:bg-blue-600','bg-gray-700'); btn.classList.add('cursor-not-allowed','opacity-80');
-                const currentChordType = btn.getAttribute('data-chord-type');
-                if (currentChordType === gameState.correctChordType) btn.classList.add('bg-green-500','text-white','font-bold');
-                else if (btn === selectedButton) btn.classList.add('bg-red-500','text-white','font-bold');
+        function playCurrentChord() {
+            const rootFreq = NOTE_FREQS[gameState.currentRoot];
+            const intervals = CHORD_DEFINITIONS[gameState.currentChordType];
+            const now = audioCtx.currentTime;
+
+            intervals.forEach(semitones => {
+                const noteFreq = rootFreq * Math.pow(2, semitones / 12);
+                playSynthNote(noteFreq, now, 2.5);
             });
-            if (isCorrect) { gameState.score++; elements.score.textContent = gameState.score; elements.feedbackMessage.textContent = '✅ Correcte! Acord: ' + gameState.currentChordLabel; elements.feedbackMessage.classList.add('text-green-400'); }
-            else { elements.feedbackMessage.textContent = '❌ Incorrecte. La resposta era: ' + gameState.currentChordLabel; elements.feedbackMessage.classList.add('text-red-400'); }
-            elements.nextRoundButton.classList.remove('hidden');
         }
 
+        /* ==========================================
+           3. TIMER & ANSWER HANDLING
+           ========================================== */
         function startTimer() {
-            gameState.timeRemaining = TIMER_DURATION; elements.timeRemaining.textContent = TIMER_DURATION; elements.progressBar.style.width = '100%';
-            if (gameState.timer) clearInterval(gameState.timer);
+            clearInterval(gameState.timer);
+            gameState.timeLeft = 30;
+            updateTimerUI();
+
             gameState.timer = setInterval(() => {
-                gameState.timeRemaining--; elements.timeRemaining.textContent = gameState.timeRemaining;
-                const percentage = (gameState.timeRemaining / TIMER_DURATION) * 100; elements.progressBar.style.width = `${percentage}%`;
-                elements.progressBar.classList.remove('bg-red-500','bg-blue-600');
-                if (gameState.timeRemaining <= 10) elements.progressBar.classList.add('bg-red-500'); else elements.progressBar.classList.add('bg-blue-600');
-                if (gameState.timeRemaining <= 0) {
+                gameState.timeLeft--;
+                updateTimerUI();
+
+                if (gameState.timeLeft <= 0) {
                     clearInterval(gameState.timer);
-                    if (!gameState.isAnswered) {
-                        elements.feedbackMessage.textContent = '⏱️ Temps esgotat! La resposta era: ' + gameState.currentChordLabel;
-                        elements.feedbackMessage.classList.add('text-red-400'); elements.nextRoundButton.classList.remove('hidden'); gameState.isAnswered = true;
-                        Array.from(elements.intervalOptions.children).forEach(btn => { if (btn.getAttribute('data-chord-type') === gameState.correctChordType) btn.classList.add('bg-green-500','text-white','font-bold'); btn.disabled = true; btn.classList.add('cursor-not-allowed','opacity-80'); });
-                    }
+                    handleAnswer(null, null); // Time out
                 }
             }, 1000);
         }
 
-        function endGame() { clearInterval(gameState.timer); elements.finalScore.textContent = gameState.score; showScreen('result'); }
-        function resetGame() { clearInterval(gameState.timer); showScreen('difficulty'); gameState.score = 0; gameState.round = 0; }
-
-        // Inicialització
-        window.onload = function() {
-                // ensure first gesture unlocks audio on mobile
-                elements.playButton.onclick = async function(e) {
-                    await ensureAudioUnlocked();
-                    // small delay to allow resumed state to settle
-                    setTimeout(() => { playChord(); }, 50);
-                };
-            elements.nextRoundButton.onclick = () => { const MAX_ROUNDS = 20; if (gameState.round >= MAX_ROUNDS) endGame(); else loadNextRound(); };
-            initializeHardChordsList();
-            // Mostrem pantalla de dificultat
-            screens.difficulty.classList.remove('opacity-0');
-
-            // Hook up error popup buttons
-            const showErrorsBtn = document.getElementById('showErrorsBtn');
-            const retryErrorsBtn = document.getElementById('retryErrorsBtn');
-            if (showErrorsBtn) showErrorsBtn.onclick = () => {
-                const arr = Array.from(audioLoader.failedUrls || []);
-                alert('Failed URLs:\n' + (arr.slice(0,50).join('\n')) + (arr.length > 50 ? `\n... +${arr.length-50} more` : ''));
-            };
-            if (retryErrorsBtn) retryErrorsBtn.onclick = () => {
-                retryFailedUrls();
-            };
-        };
-
-        // Retry logic: parse failed URLs and attempt to reload them with low concurrency / backoff
-        function parseUrlToParts(url) {
-            try {
-                const file = url.split('/').pop(); // e.g. Cs3-Maj.mp3
-                const [name] = file.split('.');
-                const dash = name.indexOf('-');
-                const root = name.slice(0, dash);
-                const chord = name.slice(dash+1);
-                // Convert root back to midi: simple parse assuming last char is octave
-                const m = root.match(/^([A-G]s?)(-?\d+)$/);
-                if (!m) return null;
-                const note = m[1]; const octave = parseInt(m[2], 10);
-                const fileNotesMap = {C:0, Cs:1, D:2, Ds:3, E:4, F:5, Fs:6, G:7, Gs:8, A:9, As:10, B:11};
-                if (!(note in fileNotesMap)) return null;
-                const midi = (octave + 1) * 12 + fileNotesMap[note];
-                return { midi, chord };
-            } catch(e) { return null; }
+        function updateTimerUI() {
+            document.getElementById('timer-text').innerText = gameState.timeLeft + 's';
+            const percentage = (gameState.timeLeft / 30) * 100;
+            document.getElementById('timer-fill').style.width = percentage + '%';
         }
 
-        // Removed retryFailedUrls function as requested.
+        function handleAnswer(selectedChord, buttonEl) {
+            if (!gameState.canAnswer) return;
+            gameState.canAnswer = false;
+            clearInterval(gameState.timer);
+
+            const isCorrect = selectedChord === gameState.currentChordType;
+            const buttons = document.querySelectorAll('.btn-answer');
+
+            buttons.forEach(btn => btn.disabled = true);
+
+            if (isCorrect) {
+                gameState.score++;
+                if (buttonEl) buttonEl.classList.add('correct');
+                document.getElementById('feedback').innerText = '✨ Correcte!';
+                document.getElementById('feedback').style.color = 'var(--success)';
+            } else {
+                if (buttonEl) buttonEl.classList.add('incorrect');
+                
+                // Highlight correct button
+                buttons.forEach(btn => {
+                    if (btn.innerText === gameState.currentChordType) {
+                        btn.classList.add('correct');
+                    }
+                });
+
+                document.getElementById('feedback').innerText = selectedChord 
+                    ? `❌ Incorrecte. Era ${gameState.currentChordType}` 
+                    : `⏳ Temps esgotat! Era ${gameState.currentChordType}`;
+                document.getElementById('feedback').style.color = 'var(--error)';
+            }
+
+            setTimeout(() => {
+                if (gameState.round < 10) {
+                    gameState.round++;
+                    setupRound();
+                } else {
+                    showResults();
+                }
+            }, 2000);
+        }
+
+        function showResults() {
+            document.getElementById('view-game').classList.add('hidden');
+            document.getElementById('view-results').classList.remove('hidden');
+
+            document.getElementById('final-score').innerText = gameState.score;
+
+            const evalText = document.getElementById('final-eval');
+            if (gameState.score === 10) {
+                evalText.innerText = '🎯 Perfecte! Tens una oïda excel·lent.';
+            } else if (gameState.score >= 7) {
+                evalText.innerText = '👏 Molt bé! Estàs progressant ràpidament.';
+            } else if (gameState.score >= 5) {
+                evalText.innerText = '👍 Bon intent, continua practicant!';
+            } else {
+                evalText.innerText = '💪 No et rendeixis, la pràctica fa el mestre!';
+            }
+        }
     </script>
-
-
-    
 </body>
 </html>
-
